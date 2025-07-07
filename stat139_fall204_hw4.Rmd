@@ -1,0 +1,542 @@
+---
+title: "Problem Set 4"
+author: "STAT 139 (Fall 2024) Teaching Team"
+date: "Due Friday, October 4, 2024 at 11:59pm"
+fontsize: 11pt
+geometry: margin=1in
+output:
+  pdf_document:
+    includes:
+    fig_width: 5
+    fig_height: 3.5
+urlcolor: blue
+---
+
+
+
+
+
+\begin{small} 
+		
+\textbf{Problem set policies.} \textit{Please provide concise, clear answers for each question while making sure to fully explain your reasoning. For problems asking for calculations, show your work in addition to clearly indicating the final answer. For problems involving \texttt{R}, be sure to include the code and output in your solution.}
+
+\textit{Please submit the PDF of your knit solutions to Gradescope and be sure to assign which pages of your solution correspond to each problem. Make sure that the PDF is fully readable to the graders; e.g., make sure that lines don't run off the page margin.}
+
+\textit{We encourage you to discuss problems with other students (and, of course, with the teaching team), but you must write your final answer in your own words. Solutions prepared ``in committee'' are not acceptable. If you do collaborate with classmates on a problem, please list your collaborators on your solution. Be aware that simply copying answers found online, whether human-generated or machine-generated, is a violation of the Honor Code.}
+		
+\end{small}
+
+
+\clearpage
+
+
+### Question 1
+
+Consider a simple linear regression, with an intercept and one predictor.
+	
+\noindent\textbf{(a)} Write down the design matrix $\mathbf{X}$ and calculate the 2 x 2 matrix $(\mathbf{X}^T \mathbf{X})^{-1}$.
+
+
+
+
+$$
+\mathbf{X} = \begin{bmatrix}
+1 & X_1 \\
+1 & X_2 \\
+1 & X_3 \\
+\vdots & \vdots \\
+1 & X_m \\
+\end{bmatrix}
+$$
+
+
+$$
+\mathbf{X}^T \mathbf{X} = \begin{bmatrix}
+1 & 1 & 1 & \dots & 1 \\
+X_1 & X_2 & X_3 & \dots & X_m
+\end{bmatrix}
+\begin{bmatrix}
+1 & X_1 \\
+1 & X_2 \\
+1 & X_3 \\
+\vdots & \vdots \\
+1 & X_m
+\end{bmatrix} = \begin{bmatrix}
+m & \sum_{i=1}^m X_i \\
+\sum_{i=1}^m X_i & \sum_{i=1}^m X_i^2
+\end{bmatrix}
+$$
+$$
+\begin{bmatrix}
+m & \sum_{i=1}^m X_i \\
+\sum_{i=1}^m X_i & \sum_{i=1}^m X_i^2
+\end{bmatrix}
+$$
+
+$$
+\left(\begin{bmatrix}
+m & \sum_{i=1}^m X_i \\
+\sum_{i=1}^m X_i & \sum_{i=1}^m X_i^2
+\end{bmatrix}\right)^{-1} = \frac{1}{m \sum_{i=1}^m X_i^2 - \left(\sum_{i=1}^m X_i\right)^2} \begin{bmatrix}
+\sum_{i=1}^m X_i^2 & -\sum_{i=1}^m X_i \\
+-\sum_{i=1}^m X_i & m
+\end{bmatrix}
+$$
+
+
+
+
+
+\noindent\textbf{(b)} Show that the vector $\hat{\vec{\beta}}=(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \vec{Y}$ provides the usual least squares estimates of the intercept and the slope.
+
+
+$$
+\left(\mathbf{X}^T \mathbf{X}\right)^{-1} = \frac{1}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2} \begin{bmatrix}
+\sum_{i=1}^m X_i^2 & -\sum_{i=1}^m X_i \\
+-\sum_{i=1}^m X_i & m \\
+\end{bmatrix}
+$$
+
+multiply above inverse by $(\mathbf{X}^T \vec{Y})$ to find the least squares estimates:
+
+$$
+\mathbf{X}^T \vec{Y} = \begin{bmatrix}
+\sum_{i=1}^m Y_i \\
+\sum_{i=1}^m X_i Y_i \\
+\end{bmatrix}
+$$
+
+$$
+\hat{\beta}_0 = \frac{\sum_{i=1}^m X_i^2 \sum_{i=1}^m Y_i - \sum_{i=1}^m X_i \sum_{i=1}^m X_i Y_i}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2}
+\hat{\beta}_1 = \frac{m \sum_{i=1}^m X_i Y_i - \sum_{i=1}^m X_i \sum_{i=1}^m Y_i}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2}
+$$
+
+
+\noindent\textbf{(c)} Show that the diagonal elements of the 2 x 2 matrix $\sigma^2 (\mathbf{X}^T \mathbf{X})^{-1}$ provide the usual variances of the least squares estimates of the intercept and the slope for a simple linear regression.
+
+
+
+$$
+\sigma^2\left(\mathbf{X}^T \mathbf{X}\right)^{-1} = \frac{\sigma^2}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2} \begin{bmatrix}
+\sum_{i=1}^m X_i^2 & -\sum_{i=1}^m X_i \\
+-\sum_{i=1}^m X_i & m \\
+\end{bmatrix}
+$$
+
+$$
+\text{Var}(\hat{\beta}_0) = \sigma^2 \frac{\sum_{i=1}^m X_i^2}{m \sum_{i=1}^m X_i^2 - \left(\sum_{i=1}^m X_i\right)^2}
+$$
+
+$$
+\text{Var}(\hat{\beta}_1) = \sigma^2 \frac{m}{m \sum_{i=1}^m X_i^2 - \left(\sum_{i=1}^m X_i\right)^2}
+$$
+
+
+		
+\noindent\textbf{(d)} A second predictor is being considered for inclusion in the model ($X_2$).  Under what conditions will its presence in the model have no effect on the estimates of $\beta_0$ and $\beta_1$?
+
+since 
+
+$$
+\begin{bmatrix}
+\hat\beta_0 \\
+\hat\beta_1
+\end{bmatrix} = (\mathbf{X}^T\mathbf{X})^{-1} \mathbf{X}^T \vec{Y} 
+$$
+
+an additional predictor $X_2$ can leave $\beta_0$ and $\beta_1$ unchanged if $X_2$ has no predictive effect on Y, meaning the term $\mathbf{X}^T \vec{Y}$ will have a 0 in the third row. 
+
+$$
+\begin{bmatrix}
+\hat\beta_0 \\
+\hat\beta_1 \\
+0
+\end{bmatrix} = (\mathbf{X}^T\mathbf{X})^{-1}  \begin{bmatrix}
+\sum_{i=1}^m Y_i \\
+\sum_{i=1}^m X_i Y_i \\
+0 
+\end{bmatrix}
+$$
+
+Additionally, $X_2$ must have zero correlation with the intercept and $X_1$ so that the dot product between $X_2$ and $X_1$ and $X_2$ and intercept will be 0. 
+
+$$
+\mathbf{X}^T \mathbf{X} = \begin{bmatrix}
+1 & 1 & 1 & \dots & 1 \\
+X_{11} & X_{12} & X_{13} & \dots & X_{1m} \\
+X_{21} & X_{22} & X_{23} & \dots & X_{2m}
+\end{bmatrix}
+\begin{bmatrix}
+1 & X_{11} & X_{21} \\
+1 & X_{12} & X_{22} \\
+1 & X_{13} & X_{23} \\
+\vdots & \vdots & \vdots \\
+1 & X_{1m} & X_{2m}
+\end{bmatrix} = \begin{bmatrix}
+m & \sum_{i=1}^m X_{1i} & \sum_{i=1}^m X_{2i} \\
+\sum_{i=1}^m X_{1i} & \sum_{i=1}^m X_{1i}^2 & \sum_{i=1}^m X_{1i} X_{2i} \\
+\sum_{i=1}^m X_{2i} & \sum_{i=1}^m X_{1i} X_{2i} & \sum_{i=1}^m X_{2i}^2
+\end{bmatrix}
+$$
+
+
+if the above zero correlation condition is met, 
+$$
+\mathbf{X}^T \mathbf{X} = \begin{bmatrix}
+m & \sum_{i=1}^m X_{1i} & 0 \\
+\sum_{i=1}^m X_{1i} & \sum_{i=1}^m X_{1i}^2 & 0 \\
+0 & 0 & 0
+\end{bmatrix}
+$$
+And by the same logic in part (b), the estimates remain as follows
+
+
+$$
+\hat{\beta}_0 = \frac{\sum_{i=1}^m X_i^2 \sum_{i=1}^m Y_i - \sum_{i=1}^m X_i \sum_{i=1}^m X_i Y_i}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2}
+\hat{\beta}_1 = \frac{m \sum_{i=1}^m X_i Y_i - \sum_{i=1}^m X_i \sum_{i=1}^m Y_i}{m \sum_{i=1}^m X_i^2 - (\sum_{i=1}^m X_i)^2}
+$$
+
+
+\vspace{0.1in}
+
+
+
+### Question 2
+
+In this problem you will code up your own linear regression calculations in \textsf{R}. In parts (a)-(g) you will attempt to replicate the results of `lm()` using the `GaltonFamilies` dataset in the `HistData` package. Specifically, in Lecture 7, we fit the following model:
+
+$$\vec{Y} = \beta_0 + \beta_1 \vec{x}_1 + \beta_2 \vec{x}_2 + \beta_3 \vec{x}_3 + \vec{\varepsilon}~~~~~~~~\vec{\varepsilon} \sim \mathcal{N} (\vec{0}, \sigma^2 I)$$
+where:
+
+$Y=$ child height
+
+$x_1=$ midparent height $=\frac{\text{father height} + 1.08 \times \text{mother height}}{2}$
+
+$x_2=$ an indicator of male gender
+
+$x_3=$ birth order 
+
+\vspace{1em}
+
+```{r}
+library(HistData)
+```
+
+
+\noindent\textbf{(a)} Start by fitting the model in \textsf{R} with `lm()` and saving the output as an object named `lm.out`.
+
+```{r}
+data <- GaltonFamilies
+
+# create binary indicator of male gender
+bin.gender <- ifelse(data$gender == 'male',1,0)
+data$bin.gender <- bin.gender
+
+lm.out <- lm(childHeight ~ midparentHeight+bin.gender+childNum, data = data)
+summary(lm.out)
+```
+
+
+\noindent\textbf{(b)} Use matrix algebra in \textsf{R} to manually compute the least squares estimates of the $\beta$ coefficients. Extract the coefficients from your `lm()` object and show that your estimates match these exactly.
+
+$$
+\hat{\vec{\beta}}=(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \vec{Y}
+$$
+
+```{r}
+Y <- data$childHeight
+X <- data[, c('midparentHeight', 'bin.gender', 'childNum')]
+X <- cbind(1, X) #add 1's for intercept col
+
+#Note: must convert df to matrix for R linalg to work; t() does this automatically
+beta_hat <- solve(t(X) %*% as.matrix(X)) %*% t(X) %*% Y
+beta_hat
+```
+```{r}
+# matches exactly to above
+lm.out$coefficients
+```
+
+
+\noindent\textbf{(c)} Compute the residual standard error using matrix algebra in \textsf{R}. Extract the estimate from your `lm()` object and show that they match exactly.
+
+$$
+RSS = (\vec{e})^T \vec{e}
+$$
+$$
+RSE = \sqrt{\frac{RSS}{n - p}}
+$$
+```{r}
+e.vec <- lm.out$residuals
+p <- p <- length(coef(lm.out))
+n <- length(e.vec)
+RSE <- sqrt((t(e.vec)%*%e.vec)/(n-p))
+RSE
+```
+
+```{r}
+summary.lm.out <- summary(lm.out)
+summary.lm.out$sigma 
+```
+
+
+
+\noindent\textbf{(d)} Use matrix algebra in \textsf{R} to manually compute the variance-covariance matrix of your $\beta$ estimates. Extract the variance-covariance matrix from your `lm()` object and show that your version matches \textsf{R}'s exactly. 
+
+$$
+{Var}(\hat{\beta}) = \sigma^2 (\mathbf{X}^T \mathbf{X})^{-1}
+$$
+
+```{r}
+sigma_hat_squared <- sum(e.vec^2) / (n - p)
+
+sigma_hat_squared * solve(t(X) %*% as.matrix(X))
+
+```
+
+
+```{r}
+# get variance-covariance matrix from lm.out
+vcov.lm.out <- vcov(lm.out)
+vcov.lm.out
+```
+
+
+\noindent\textbf{(e)} Manually recreate the table given by `summary(lm.out)$coefficients`. That is, in addition to the $\beta$ coefficients you computed above, compute the standard errors, $t$-statistics and p-values, and organize the data in an attractive tabular format that exactly matches the results given by \textsf{R}.
+
+
+
+```{r}
+#compute each stepwise
+standard.errors <- sqrt(diag(vcov.lm.out))
+t.stats <- lm.out$coefficients / standard.errors
+p.val <- 2 * (1 - pt(abs(t.stats), df = n - p))
+
+#create df with rownames same as summary
+manual.table <- data.frame(Estimate = beta_hat,
+                           'Std. Error' = standard.errors,
+                           't value' = t.stats,
+                           'Pr(>|t|)' = p.val,
+                           row.names = c('(Intercept)', rownames(beta_hat)[2:4]))
+
+manual.table
+```
+
+Note: Pr(>|t|) is 0 because values are less than 2e-16
+
+
+\noindent\textbf{(f)} Manually construct a 95\% confidence interval for the average height of sons born to 5\'8\'\' fathers and 5\'5\'\' mothers who have 3 older siblings. Show that your interval exactly matches that given by the `predict()` function in \textsf{R}.
+
+
+```{r}
+# filter data by above conditions
+idx <- (69 > data$father & data$father >= 68) & (66 > data$mother & data$mother >= 65) & data$childNum == 4 & bin.gender == 1
+
+# assuming conditions must be exact
+idx <- data$midparentHeight == 69.35 & data$childNum == 4 & bin.gender == 1
+f.data <- data[idx,]
+
+f.data
+```
+
+$$
+\hat{y}_0 \pm t^* \cdot \hat{\sigma}^2\sqrt{\left( \mathbf{x}_0^T (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{x}_0 \right)}
+$$
+
+```{r}
+# get predicted value from og data with filtered data
+predicted.y <- predict(lm.out, newdata = f.data, type = "response")
+
+#get t distribution for 95% confint 930 df
+t.star <- qt(0.975, 930)
+
+#summary lmout and get terms for eq
+summary.lm.out <- summary(lm.out)
+sigma.squared.hat <- sum(residuals(lm.out)^2) / lm.out$df.residual
+
+# Design matrix for the new data
+X0 <- model.matrix(~ midparentHeight + bin.gender + childNum, data = f.data)
+X <- X[idx,]
+
+# since vcov() = (X^TX)^-1 * sigma^2, divide by residual variance to get leverage
+leverage <- diag(X0 %*% vcov(lm.out) %*% t(X0))/sigma.squared.hat
+prediction.var <- sigma.squared.hat * leverage
+
+# get se by taking sqrt
+se.prediction <- sqrt(prediction.var)
+ci.lower <- predicted.y - t.star * se.prediction
+ci.upper <- predicted.y + t.star * se.prediction
+
+ci.lower
+ci.upper
+```
+
+
+```{r}
+#non manual confidence intervals match above
+prediction_results <- predict(lm.out, newdata = f.data, interval = "confidence")
+print(prediction_results)
+```
+
+
+
+
+
+
+\noindent\textbf{(g)} Manually construct a prediction interval for a son born to a 5\'8\'\' father and a 5\'5\'\' mother who has 3 older siblings. Show that your interval exactly matches that given by the `predict()` function \textsf{R}.
+
+$$
+\hat{y}_0 \pm t^* \cdot \hat{\sigma}^2\sqrt{1+ \left( \mathbf{x}_0^T (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{x}_0 \right)}
+$$
+
+```{r}
+# use same logic as above with the added penalty for prediction
+# get se by taking sqrt with additional penalty
+prediction.var <- sigma.squared.hat * (1 + leverage)
+se.prediction <- sqrt(prediction.var)
+
+pi.lower <- predicted.y - t.star * se.prediction
+pi.upper <- predicted.y + t.star * se.prediction
+
+pi.lower
+pi.upper
+```
+```{r}
+# Ge intervals
+prediction_results <- predict(lm.out, newdata = f.data, interval = "prediction")
+print(prediction_results)
+```
+
+
+
+
+\noindent\textbf{(h)} Interpret the intervals in parts (f) and (g).
+
+In part f, 95% of sample means of observed male child heights born to a 5\'8\'\' father and a 5\'5\'\' mother that have 3 older siblings are expected to fall between 6.843123e+01 and 6.886705e+01 inches.
+
+In part g, given the information about the independent variables that we know, that the male child was born to a 5\'8\'\' father and a 5\'5\'\' mother that has 3 older siblings, there is a 95% chance that any individual prediction will fall between 6.467044e+01 and 7.262784e+01 inches. 
+
+\noindent\textbf{(i)} Conduct a formal hypothesis test at the $\alpha=0.05$ level of whether sons born to 5\'8\'\' fathers and 5\'5\'\' mothers who have 3 older siblings are taller on average than daughters born to 6\'0\'\' fathers and 5\'10\'\' mothers who have no older siblings.
+
+```{r}
+idx2 <- (data$father >= 72 & data$father < 73) & 
+        (data$mother >= 70 & data$mother < 71) & 
+        data$gender == 'female' & 
+        data$childNum == 1
+
+i.data <- data[idx2,]
+
+#create new lm with both subsets
+lm.i <- lm(childHeight ~ bin.gender + childNum, data = data)
+
+# get contrast vector for each and determine if gender (sons vs daughters) are different
+c1 <- c(0, 0,0)  
+c2 <- c(0, 1,0)
+c <- c2 - c1
+
+# Calculate the variance associated with the contrast
+contrast.variance <- t(c) %*% vcov(lm.i) %*% c
+
+#get estimate of residual variance
+sigma.squared.hat <- sum(residuals(lm.i)^2) / lm.i$df.residual
+
+# get test statistic T
+gamma.0 <- 0  
+T <- (t(c) %*% coef(lm.i) - gamma.0) / sqrt(sigma.squared.hat * contrast.variance)
+
+#print test statistic
+print(T)
+
+#do not multiply by two because one sided test (one group is taller on average)
+p.value <- (1 - pt(abs(T), lm.out$df.residual))
+
+#conduct hypothesis test
+if(p.value < 0.05){
+  cat("the null hypothesis that that one of the groups is taller on average is rejected at p value of: ", p.value)
+} else {
+  print("there is not enough evidence for the null hypothesis to be rejected; sons born to 5\'8\'\' fathers and 5\'5\'\' mothers who have 3 older siblings are NOT taller on average than daughters born to 6\'0\'\' fathers and 5\'10\'\' mothers who have no older siblings ")
+}
+```
+```{r}
+# debugging
+# Check the summary of above
+summary(lm.i)
+p.value
+```
+
+
+
+
+### Question 3
+
+Prove the theorem on slide 10 of lecture 7 (given on Wednesday, September 25).
+
+$$
+\vec{Z} = A \vec{Y} + \vec{b}
+$$
+$$
+E(\vec{Z}) = E(A \vec{Y} + \vec{b})
+$$
+
+Due to linearity
+
+$$
+E(\vec{Z}) = E(A \vec{Y})+ E(\vec{b})
+$$
+Since expected value of constant is the constant and expected value of $\vec{Y}$ is $\mu$
+$$
+E(\vec{Z}) = A*E(\vec{Y})+ \vec{b}
+$$
+Since expected value of $\vec{Y}$ is $\mu$
+$$
+E(\vec{Z}) = A\mu+\vec{b}
+$$
+$$
+Cov(\vec{Z}) = Cov(A\vec{Y}+b)
+$$
+Linearity 
+$$
+Cov(\vec{Z}) = Cov(A\vec{Y})+ Cov(b)
+$$
+constant has no variance
+
+$$
+Cov(\vec{Z}) = Cov(A\vec{Y}) 
+$$
+distributive property of matrix multiplication
+$$
+Cov(A\vec{Y}) = A*Cov(\vec{Y})*A^T
+$$
+
+$$
+Cov(\vec{Z}) = A\Sigma A^T
+$$
+
+
+
+
+### Question 4
+
+Prove the theorem on slide 11 of lecture 7 (given on Wednesday, September 25).
+
+$\vec{Y}$ is normally distributed: $\vec{Y} \sim N(\vec{\mu}, \Sigma)$.
+
+$\vec{Z}$ is also normally distributed since it is a linear transformation of $\vec{Y}$: $\vec{Z} = A\vec{Y} + \vec{b}$
+ 
+$$
+ E(\vec{Z}) = E(A\vec{Y} + \vec{b}) = AE(\vec{Y}) + \vec{b} = A\vec{\mu} + \vec{b}
+$$
+Thus, the mean of normally distributed $\vec{Z}$ is $A\vec{\mu} + \vec{b}$
+
+$$
+\text{Cov}(\vec{Z}) = \text{Cov}(A\vec{Y} + \vec{b}) = A \text{Cov}(\vec{Y}) A^T = A\Sigma A^T
+$$
+The variance of $\vec{Z}$ is $A\Sigma A^T$
+
+Therefore, $\vec{Z}$ can be represented as a normal distribution described by the mean and variance proved above.
+$$
+\vec{Z} \sim N(A\vec{\mu} + \vec{b}, A\Sigma A^T)
+$$
+
+This proof demonstrates the properties of Gaussian vectors under linear transformations and translations, confirming that the transformation preserves the normality of the distribution.
+

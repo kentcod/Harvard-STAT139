@@ -1,0 +1,564 @@
+---
+title: "STAT139_MS3"
+output: pdf_document
+date: "2024-11-25"
+author: "Andrew Medrano, Charlotte Cheah, Kent Codding, Anay Patel and Miranda Shen"
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(ggplot2)
+library(gridExtra) # For arranging plots side by side
+library(caret)     # For data preprocessing
+library(dplyr)     # For data processing for Lasso
+library(tidyr)
+library(glmnet)    # For Lasso regression
+```
+
+## Finalized Research Question
+Which personal and exercise characteristics have the largest effect on calories burned during a workout, and can we predict how many calories will be burned?
+
+## Hypothesis
+Age will be a strong predictor of how many calories will be burned.
+
+## Description of the Data
+The author, Vala Khorasani, states that the dataset was "generated to reflect realistic exercise tracking scenarios with diverse participants." However, the author does not disclose any additional information about how the data simulation process was conducted on the Kaggle website. The synthetic data becomes evident in Exploratory Data Analysis later on in visualizations of 'Gender', for instance.
+
+## Summary of the Data
+Dataset Features:
+
+ - **Age**: Age of the gym member.
+ 
+ - **Gender**: Gender of the gym member (Male or Female).
+ 
+- **Weight (kg)**: Member’s weight in kilograms.
+- **Height (m)**: Member’s height in meters.
+- **Max_BPM**: Maximum heart rate (beats per minute) during workout sessions.
+- **Avg_BPM**: Average heart rate during workout sessions.
+- **Resting_BPM**: Heart rate at rest before workout.
+- **Session_time**: Duration of each workout session in hours.
+- **Calories**: Total calories burned during each session.
+- **Workout_Type**: Type of workout performed (e.g., Cardio, Strength, Yoga, HIIT).
+- **Fat%**: Body fat percentage of the member.
+- **Water**: Daily water intake during workouts (liters).
+- **Frequency**: Number of workout sessions per week.
+- **Experience**: Level of experience, from beginner (1) to expert (3).
+- **BMI**: Body Mass Index, calculated from height and weight.
+
+
+Descriptive Statistics
+```{r, echo=FALSE}
+data <- read.csv("gym_members_exercise_tracking.csv")
+
+data$Gender <- as.factor(data$Gender)
+data$Workout_Type <- as.factor(data$Workout_Type)
+
+descriptive_stats <- function(data) {
+  numeric_data <- data[, sapply(data, is.numeric)] # Select numeric columns only
+  stats <- data.frame(
+    Mean = sapply(numeric_data, mean),
+    Median = sapply(numeric_data, median),
+    SD = sapply(numeric_data, sd),
+    Min = sapply(numeric_data, min),
+    Max = sapply(numeric_data, max),
+    Count = sapply(numeric_data, length),
+    NA_Count = sapply(numeric_data, function(x) sum(is.na(x)))
+  )
+  return(stats)
+}
+
+# Generate descriptive stats table
+stats_table <- descriptive_stats(data)
+
+# Print the table
+print(stats_table)
+```
+```{r, echo=FALSE}
+# Updated function with debugging messages
+categorical_stats <- function(data) {
+  # Select only columns that are factors
+  categorical_data <- data[, sapply(data, is.factor)]
+  
+  # Debugging: Check the selected categorical variables
+  if (ncol(categorical_data) == 0) {
+    message("No categorical variables found in the dataset.")
+    return(data.frame())
+  }
+  
+  # Create an empty data frame to store results
+  stats <- data.frame(
+    Variable = character(),
+    Count = integer(),
+    Classes = integer(),
+    Top_Class = character(),
+    Frequency = integer(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Loop through each categorical variable
+  for (var in colnames(categorical_data)) {
+    counts <- table(categorical_data[[var]])
+    top_class <- names(which.max(counts))
+    stats <- rbind(
+      stats,
+      data.frame(
+        Variable = var,
+        Count = length(categorical_data[[var]]),
+        Classes = length(unique(categorical_data[[var]])),
+        Top_Class = top_class,
+        Frequency = max(counts)
+      )
+    )
+  }
+  
+  return(stats)
+}
+
+# Generate stats for categorical variables
+cat_stats_table <- categorical_stats(data)
+
+# Print the table
+print(cat_stats_table)
+```
+
+Within each categorical variable, all classes are relatively balanced. For gender: 52% male vs 47% female. For Workout Type: 27% Strength vs 26% Cardio vs 24% Yoga vs 23% HIIT. 
+
+```{r, echo=FALSE, fig.width=13, fig.height=11}
+# Select only numeric columns
+numeric_data <- data[, sapply(data, is.numeric)]
+
+# Compute the correlation matrix
+correlation_matrix <- cor(numeric_data, use = "complete.obs")
+
+library(corrplot)
+# Adjust the plotting parameters
+
+# Visualize the correlation matrix
+corrplot(correlation_matrix, method = "color", type = "upper",
+         tl.col = "black", tl.srt = 45, addCoef.col = "black",
+         number.cex = 0.5)
+```
+
+We show a correlation matrix above of all of the variables. There are a few notable points of high positive and negative correlation that are off-diagonal. High positive correlations include: weight and BMI, Experience and workout frequency, and calories burned and session time. High negative correlations include: Fat percentage and experience, as well as fat percentage and calories burned. In observing high positive and negative correlations, we gained insights into which features may have multicollinearity or redundant information. This understanding shaped our decision to use Lasso regression in the baseline model, which can handle multicollinearity effectively by selecting only the most influential features.
+
+We show the scatter of the highly correlated variables identified in the above correlation matrix below: 
+
+```{r, echo=FALSE, fig.width=13, fig.height=5}
+# Plot 1: Weight vs BMI by Gender
+plot1 <- ggplot(data, aes(x = Weight..kg., y = BMI, color = Gender)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Weight vs BMI by Gender", x = "Weight (kg)", y = "BMI") +
+  theme_minimal()
+
+# Plot 2: Experience Level vs Workout Frequency
+plot2 <- ggplot(data, aes(x = Experience_Level, 
+                          y = Workout_Frequency..days.week.)) +
+  geom_point() +
+  labs(title = "Experience Level vs Workout Frequency", x = "Experience Level", y = "Workout Frequency (Days/Week)") +
+  theme_minimal()
+
+# Plot 3: Session Duration vs Calories Burned by Workout Type
+plot3 <- ggplot(data, aes(x = Session_Duration..hours., 
+                          y = Calories_Burned, color = Workout_Type)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Session Duration vs Calories Burned", x = "Session Duration (minutes)", y = "Calories Burned") +
+  theme_minimal()
+
+# Arrange the plots side by side
+grid.arrange(plot1, plot2, plot3, ncol = 3)
+```
+
+From the first plot, we know that weight and gender are two of the variables which are used to calculate BMI. In the second plot, we can see artifacts of the synthetic data generation process. Weekly workout frequency for any specific experience group only occurred at two levels in equal proportion. In the third plot, we show how calories burned seems to be a linear function of the session duration, with no clear difference between the types of workouts.
+
+```{r, fig.width=13, fig.height=5, echo=FALSE}
+# Plot 1: Fat Percentage by Experience Level (Boxplots)
+plot1 <-ggplot(data, aes(x = Experience_Level, y = Fat_Percentage)) +
+  geom_jitter(width = 0.2, size = 3, alpha = 0.7, color = "#1f77b4") + # Add jitter for better separation
+  labs(title = "Fat Percentage by Experience Level", x = "Experience", y = "Fat (%)") +
+  theme_minimal(base_size = 14) + # Minimal theme
+  theme(
+    axis.title.x = element_text(size = 14, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16)
+  )
+
+# Plot 2: Fat Percentage vs Calories Burned by Workout Type
+plot2 <- ggplot(data, aes(x = Fat_Percentage, y = Calories_Burned, color = Workout_Type)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Fat Percentage vs Calories Burned", x = "Fat Percentage (%)", y = "Calories Burned") +
+  theme_minimal()
+
+# Arrange the plots side by side
+grid.arrange(plot1, plot2, ncol = 2)
+```
+
+We show the variables that we identified as highly negatively correlated with each other in the plots above.  In the first plot, we see that fat percentage is similar across experience in levels 1 and 2, with a large drop in experience in level 3. In the second plot, we note that people who have a higher body fat percentage appear to burn more calories in their workouts. 
+
+## Noteworthy Results and Findings
+We expected that people with lower body fat would burn more calories during their workouts, given that muscle tissue burns more calories than fat, however, we find the opposite is true in our results. This finding is consistent with a recent article medically approved by a CPT in 2024 (Waehner). The data also showed that as gym-goers become more experienced, they work out more frequently. While beginners and intermediate exercisers had similar body fat levels, the expert-level folks had much lower body fat, suggesting that the real body composition changes kick in at advanced stages of training.
+
+One surprising finding was how calories burned increased with workout length. We expected different types of exercise to meaningfully influence calorie burn over time. Instead, we found that workout duration was the main driver of calories burned, regardless of the type of exercise. We reason that many of these findings are artifacts of the data simulation process and are not indicative of real world phenomena.
+
+## Preparing data for modelling 
+```{r}
+# Preprocess the data
+data$Gender <- ifelse(data$Gender == "Male", 1, 0) # Encode Gender as 0/1
+temp <- data$Calories_Burned
+data <- model.matrix(Calories_Burned ~ ., data)[, -1] # One-hot encode Workout_Type
+data <- as.data.frame(data)                          # Convert to data frame
+
+# Ensure Calories_Burned is retained
+data$Calories_Burned <- temp
+
+# Split into training and test sets
+set.seed(123)
+train_index <- createDataPartition(data$Calories_Burned, p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Scale the numerical variables
+preprocessor <- preProcess(train_data[, -ncol(train_data)], method = c("center", "scale"))
+train_scaled <- predict(preprocessor, train_data[, -ncol(train_data)])
+test_scaled <- predict(preprocessor, test_data[, -ncol(test_data)])
+train_scaled$Calories_Burned <- train_data$Calories_Burned
+test_scaled$Calories_Burned <- test_data$Calories_Burned
+```
+
+## Fitting a linear regression model
+We fit a linear regression to predict the number of calories burned and to interpret which variables contribute the most to this prediction.
+
+To determine which variables to include in our model, we will use a combined stepwise approach. Therefore, we start by firstly fitting an intercept only and full model. We will consider a model that had interaction terms in the model selection approach (in the case that any of these variables end up being relevant), and one that does not, and will test if one model is better than the other.
+
+```{r,echo=FALSE}
+set.seed(139)
+lm_intercept <- lm(Calories_Burned ~ Age, data = train_scaled)
+lm_full <- lm(Calories_Burned ~ ., data = train_scaled)
+lm_full_interact <- lm(Calories_Burned ~ .^2, data = train_scaled)
+```
+
+Resulting model from combined stepwise approach with no interaction terms:
+```{r,echo=FALSE}
+stepwise_model <- step(lm_intercept, 
+                       scope=list(lower = formula(lm_intercept),
+                                  upper = formula(lm_full)), 
+                       direction = "both", trace = 0)
+
+print(formula(stepwise_model))
+```
+
+Resulting model from combined stepwise approach with interaction terms:
+```{r,echo=FALSE}
+stepwise_model_interact <- step(lm_intercept, 
+                       scope=list(lower = formula(lm_intercept),
+                                  upper = formula(lm_full_interact)), 
+                       direction = "both", trace = 0)
+
+print(formula(stepwise_model_interact))
+```
+
+We can now fit both of these models on the training data and see which one does better on the test data.
+```{r,echo=FALSE}
+lm_stepwise <- lm(Calories_Burned ~ Age + Session_Duration..hours. + Avg_BPM + 
+                 Gender + Workout_TypeYoga + BMI, 
+               data = train_scaled)
+lm_stepwise_interact <- lm(Calories_Burned ~ Age + Session_Duration..hours. +
+                           Avg_BPM + Gender + Workout_TypeStrength + BMI +
+                           Water_Intake..liters. +
+                           Session_Duration..hours.:Avg_BPM + 
+                           Session_Duration..hours.:Gender +
+                           Age:Session_Duration..hours. + Avg_BPM:Gender +
+                           Age:Avg_BPM +
+                           Session_Duration..hours.:Workout_TypeStrength +
+                           Age:Gender + 
+                           Workout_TypeStrength:BMI + 
+                           Gender:Workout_TypeStrength +
+                           Session_Duration..hours.:BMI, 
+               data = train_scaled)
+```
+
+The selected model with the interaction terms includes a large number of variables, however it seems that they are all significant at a 0.05 level except for one of the variables: Water Intake in Liters.
+
+We will use the 20% test set to see how both models do on unseen data to ensure that the model was trained on a substantial portion of the data while reserving a separate set for evaluation. 
+
+```{r, echo=FALSE}
+set.seed(139)
+# predictions on test set for model without interactions
+predictions_lm <- 
+  predict(lm_stepwise, 
+          newdata = test_scaled[, c("Age", "Session_Duration..hours.", 
+                                                    "Avg_BPM", "Gender", 
+                                                    "Workout_TypeYoga", "BMI")])
+
+test_rmse_lm <- sqrt(mean((test_scaled$Calories_Burned - predictions_lm)^2))
+
+# predictions on test set for model with interactions
+predictions_lm_interact <- 
+  predict(lm_stepwise_interact, 
+          newdata = test_scaled[, -ncol(train_scaled)])
+
+test_rmse_lm_interact <- 
+  sqrt(mean((test_scaled$Calories_Burned - predictions_lm_interact)^2))
+
+cat( "rmse for linear regression (no interactions): ", 
+    test_rmse_lm, "\n",
+    "rmse for linear regression (with interactions): ", 
+    test_rmse_lm_interact)
+```
+```{r,echo=FALSE}
+print(AIC(lm_stepwise, lm_stepwise_interact))
+```
+
+We can see from the RMSE of both models that using the model that included interactions in the stepwise model selection shows a strong improvement compared to that which does not. As the models are not nested, we also use the AIC to compare them - this result also suggests that the interaction model is better suited.
+
+## Lasso Regression Model
+We trained a Lasso regression model, chosen for its feature selection capability, which helps in focusing on the most influential variables given the correlations present in the data. 
+
+The model's performance was evaluated using 5-fold cross-validation, yielding an average R² score of 0.977 with a standard deviation of 0.004, indicating high consistency and predictive power across different subsets of the data. On the test set, the model achieved a R² score of 0.98 and a Root Mean Square Error (RMSE) of 40.685, demonstrating its accuracy in predicting the target variable, Calories. The analysis of feature importance based on magnitude of coefficient values after regularization revealed that 'Session_time', 'Avg_BPM', and 'Gender_Male' were among the most influential predictors, with 'Session_Duration' having the highest positive coefficient, indicating its strong impact on the model's predictions.
+
+```{r, echo=FALSE, fig.width=13, fig.height=5}
+# Train Lasso regression model
+set.seed(123)
+cv_model <- cv.glmnet(as.matrix(train_scaled[, -ncol(train_scaled)]), train_scaled$Calories_Burned, 
+                      alpha = 1, nfolds = 5, standardize = FALSE)
+
+# Evaluate model on the test set
+predictions <- as.numeric(predict(cv_model, s = cv_model$lambda.min, 
+                                   newx = as.matrix(test_scaled[, -ncol(test_scaled)])))
+test_r2 <- 1 - sum((test_scaled$Calories_Burned - predictions)^2) / 
+                 sum((test_scaled$Calories_Burned - mean(test_scaled$Calories_Burned))^2)
+test_rmse <- sqrt(mean((test_scaled$Calories_Burned - predictions)^2))
+
+# Ensure residuals_data includes the correct columns
+residuals_data <- data.frame(
+  Predicted = as.numeric(predictions), # Convert predictions to numeric
+  Residuals = test_scaled$Calories_Burned - predictions # Calculate residuals
+)
+
+# Plot residuals
+residual_plot <- ggplot(residuals_data, aes(x = Predicted, y = Residuals)) +
+  geom_point(alpha = 0.7, color = "#1f77b4") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Residuals vs Predicted Values", x = "Predicted Calories Burned", y = "Residuals") +
+  theme_minimal()
+
+# Analyze feature importance
+coefficients <- as.data.frame(as.matrix(coef(cv_model, s = cv_model$lambda.min)))
+colnames(coefficients) <- c("Coefficient")
+coefficients$Feature <- rownames(coefficients)
+coefficients <- coefficients[coefficients$Feature != "(Intercept)", ]
+coefficients <- coefficients[order(abs(coefficients$Coefficient), decreasing = TRUE), ]
+
+# Plot feature importance
+feature_importance_plot <- ggplot(coefficients, aes(x = reorder(Feature, Coefficient), y = Coefficient)) +
+  geom_bar(stat = "identity", fill = "#1f77b4") +
+  coord_flip() +
+  labs(title = "Feature Importance (Lasso Regression)", x = "Features", y = "Coefficient") +
+  theme_minimal()
+
+# Arrange the two plots side by side
+grid.arrange(residual_plot, feature_importance_plot, ncol = 2)
+```
+## Lasso Regression Model: Interactions
+To improve the Lasso Regression model and specifically address concerns about independence suggested by the evident trend in the above Residuals Versus Predicted Values Plot, we again train a Lasso Model, this time with all interaction terms deemed important from the stepwise selection above.
+
+Once again, the model's performance was evaluated using 5-fold cross-validation. On the test set, the model increased the R² score to 0.99 and decreased the Root Mean Square Error (RMSE) of 24.46. A comparison is shown in the output below. After regularization with interaction terms, the same features, 'Session_Duration', 'Avg_BPM', 'Age', and 'Gender_Male', were among the most influential predictors, with 'Session_Duration' having the highest positive coefficient, indicating its strong impact on the model's predictions even in the presence of interaction terms. Since men have a higher percentage of muscle mass on average, we can expect men to burn more calories than women based on the aforementioned positive association between muscle mass and calories burned, supporting the positive coefficient for 'Gender_Male' (Schorr et. al, 2018).
+
+Interestingly, the highest positive coefficient for interaction term was 'Session_Duration_Avg_BPM'. This makes logical sense given that it is well-known that both workout length, reflected by session duration, and intensity, reflected by Avg_BPM, both increase energy expenditure and Session_Duration_Avg_BPM could capture the cumulative effects of these two variables in the Lasso Regression model (American Physiological Society).
+
+```{r, echo=FALSE}
+# Creating interaction terms in the training data from stepwise model above
+# Include all except Water_Intake..Liters (did not meet 0.05 significance level)
+train_scaled_important <- train_scaled %>% select(-"Water_Intake..liters.")
+train_scaled_interact <- train_scaled_important %>% 
+  mutate(Session_Duration_Avg_BPM = Session_Duration..hours. * Avg_BPM,
+         Session_Duration_Gender = Session_Duration..hours. * Gender,
+         Age_Session_Duration = Age * Session_Duration..hours.,
+         Avg_BPM_Gender = Avg_BPM * Gender,
+         Age_Avg_BPM = Age * Avg_BPM,
+         Session_Duration_Workout_TypeStrength = Session_Duration..hours. * Workout_TypeStrength,
+         Age_Gender = Age * Gender,
+         Workout_TypeStrength_BMI = Workout_TypeStrength * BMI,
+         Gender_Workout_TypeStrength = Gender * Workout_TypeStrength,
+         Session_Duration_BMI = Session_Duration..hours. * BMI)
+
+# Train Lasso model with interaction terms
+set.seed(123)
+cv_model_interact <- cv.glmnet(as.matrix(train_scaled_interact %>% select(-"Calories_Burned")), 
+                               train_scaled_interact$Calories_Burned, 
+                               alpha = 1, nfolds = 5, standardize = FALSE)
+
+# Evaluate the model on the test set
+# Adding interaction terms to test data, removing water intake
+test_scaled_important <- test_scaled %>% select(-"Water_Intake..liters.")
+test_scaled_interact <- test_scaled_important %>%
+  mutate(Session_Duration_Avg_BPM = Session_Duration..hours. * Avg_BPM,
+         Session_Duration_Gender = Session_Duration..hours. * Gender,
+         Age_Session_Duration = Age * Session_Duration..hours.,
+         Avg_BPM_Gender = Avg_BPM * Gender,
+         Age_Avg_BPM = Age * Avg_BPM,
+         Session_Duration_Workout_TypeStrength = Session_Duration..hours. * Workout_TypeStrength,
+         Age_Gender = Age * Gender,
+         Workout_TypeStrength_BMI = Workout_TypeStrength * BMI,
+         Gender_Workout_TypeStrength = Gender * Workout_TypeStrength,
+         Session_Duration_BMI = Session_Duration..hours. * BMI)
+
+# predict and calculate diagnostics
+predictions_interact <- as.numeric(predict(cv_model_interact, s = cv_model_interact$lambda.min,
+                                newx = as.matrix(test_scaled_interact %>% select(-"Calories_Burned"))))
+test_r2_interact <- 1 - sum((test_scaled_interact$Calories_Burned - predictions_interact)^2) / 
+                 sum((test_scaled_interact$Calories_Burned - mean(test_scaled_interact$Calories_Burned))^2)
+test_rmse_interact <- sqrt(mean((test_scaled_interact$Calories_Burned - predictions_interact)^2))
+
+# compare diagnostics across both Lasso models
+cat("RMSE for Lasso regression with interactions: ", test_rmse_interact, "\n",
+    "RMSE for Lasso regression without interactions: ", test_rmse, "\n")
+
+cat("R-squared for Lasso regression with interactions: ", test_r2_interact, "\n",
+    "R-squared for Lasso regression without interactions: ", test_r2)
+```
+Including interaction terms in the LASSO model clearly improves both R-squared and RMSE and addresses the independence assumption as shown in the residuals vs. predicted values plot below. However, the residuals vs. predicted values plot below clearly violates the assumption of homoscedasticity. It may be necessary to perform a log-transformation of the response variable, 'Calories_Burned' in order to address this.
+
+```{r, echo=FALSE, fig.width=13, fig.height=5}
+# Ensure residuals_data includes the correct columns
+residuals_data_interact <- data.frame(
+  Predicted = as.numeric(predictions_interact), # Convert predictions to numeric
+  Residuals = test_scaled_interact$Calories_Burned - predictions_interact # Calculate residuals
+)
+
+# Plot residuals
+residual_plot <- ggplot(residuals_data_interact, aes(x = Predicted, y = Residuals)) +
+  geom_point(alpha = 0.7, color = "#1f77b4") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Residuals vs Predicted Values", x = "Predicted Calories Burned", y = "Residuals") +
+  theme_minimal()
+
+# Analyze feature importance
+coefficients <- as.data.frame(as.matrix(coef(cv_model_interact, s = cv_model_interact$lambda.min)))
+colnames(coefficients) <- c("Coefficient")
+coefficients$Feature <- rownames(coefficients)
+coefficients <- coefficients[coefficients$Feature != "(Intercept)", ]
+coefficients <- coefficients[order(abs(coefficients$Coefficient), decreasing = TRUE), ]
+
+# Plot feature importance
+feature_importance_plot <- ggplot(coefficients, aes(x = reorder(Feature, Coefficient), y = Coefficient)) +
+  geom_bar(stat = "identity", fill = "#1f77b4") +
+  coord_flip() +
+  labs(title = "Feature Importance (Lasso Regression Interact)", x = "Features", y = "Coefficient") +
+  theme_minimal()
+
+# Arrange the two plots side by side
+grid.arrange(residual_plot, feature_importance_plot, ncol = 2)
+```
+
+The residuals vs predicted values plot shows heteroscedasticity, which is why our next step is to log-transform the data. We can also see that certain variables are really driving the feature importance graph. Specifically, Session_Duration...hours holds the greatest importance by far, followed by Avg_BPM and Gender.
+
+## Log-Transforming Data
+
+To try and handle potential heteroscedasticity, we replaced the response variable with its log-transformed version. We then repeated the same process as above, creating interaction terms and training the lasso model. Finally, predictions on the test set are made in the log scale and then back-transformed using exp(predictions) - 1 to return to the original scale of Calories_Burned.
+
+The log transformation did not improve the model's performance and may not be suitable for this dataset. The original interaction-based Lasso regression remains the better choice for modeling Calories_Burned.
+
+```{r}
+# Train Lasso model with log-transformed response variable
+set.seed(123)
+
+#add column for Log_Calories_Burned for train and test
+train_scaled_interact$Log_Calories_Burned <- train_scaled_interact$Calories_Burned %>% log
+test_scaled_interact$Log_Calories_Burned <- test_scaled_interact$Calories_Burned %>% log
+
+cv_model_log_interact <- cv.glmnet(
+  as.matrix(train_scaled_interact %>% select(-Calories_Burned, -Log_Calories_Burned)),
+  train_scaled_interact$Log_Calories_Burned,
+  alpha = 1, nfolds = 5, standardize = FALSE
+)
+
+# Predict in the log-transformed space
+predictions_log_interact <- as.numeric(predict(
+  cv_model_log_interact,
+  s = cv_model_log_interact$lambda.min,
+  newx = as.matrix(test_scaled_interact %>% select(-Calories_Burned, -Log_Calories_Burned))
+))
+
+# Calculate residual variance (sigma^2) in the log-transformed space
+log_residuals <- train_scaled_interact$Log_Calories_Burned - predict(
+  cv_model_log_interact,
+  s = cv_model_log_interact$lambda.min,
+  newx = as.matrix(train_scaled_interact %>% select(-Calories_Burned, -Log_Calories_Burned))
+)
+sigma_squared <- var(log_residuals)
+
+# Corrected back-transformation of predictions
+predictions_back_transformed <- exp(predictions_log_interact + sigma_squared / 2) - 1
+
+# Evaluate model performance
+test_rmse_log_interact <- sqrt(mean((test_scaled_interact$Calories_Burned - predictions_back_transformed)^2))
+test_r2_log_interact <- 1 - sum((test_scaled_interact$Calories_Burned - predictions_back_transformed)^2) /
+  sum((test_scaled_interact$Calories_Burned - mean(test_scaled_interact$Calories_Burned))^2)
+
+# Print evaluation metrics
+cat("RMSE for log-transformed Lasso regression (bias-corrected): ", test_rmse_log_interact, "\n",
+    "R-squared for log-transformed Lasso regression (bias-corrected): ", test_r2_log_interact, "\n")
+```
+Log-transforming the data, then running a Lasso regression on it appears to actually increase the RMSE and decrease the R-squared. 
+
+```{r}
+# Prepare residuals data
+residuals_data_log_interact <- data.frame(
+  Predicted = as.numeric(predictions_back_transformed), # Back-transformed predictions
+  Residuals = test_scaled_interact$Calories_Burned - predictions_back_transformed # Residuals
+)
+
+# Plot residuals vs predicted values
+ggplot(residuals_data_log_interact, aes(x = Predicted, y = Residuals)) +
+  geom_point(alpha = 0.7, color = "#1f77b4") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Residuals vs Predicted Values (Log-Transformed Lasso Regression)",
+    x = "Predicted Calories Burned",
+    y = "Residuals"
+  ) +
+  theme_minimal()
+
+# Extract and process coefficients
+coefficients_log_interact <- as.data.frame(as.matrix(coef(cv_model_log_interact, s = cv_model_log_interact$lambda.min)))
+colnames(coefficients_log_interact) <- c("Coefficient")
+coefficients_log_interact$Feature <- rownames(coefficients_log_interact)
+
+# Remove intercept and sort by magnitude
+coefficients_log_interact <- coefficients_log_interact[coefficients_log_interact$Feature != "(Intercept)", ]
+coefficients_log_interact <- coefficients_log_interact[order(abs(coefficients_log_interact$Coefficient), decreasing = TRUE), ]
+
+# Plot feature importance
+ggplot(coefficients_log_interact, aes(x = reorder(Feature, Coefficient), y = Coefficient)) +
+  geom_bar(stat = "identity", fill = "#1f77b4") +
+  coord_flip() +
+  labs(
+    title = "Feature Importance (Log-Transformed Lasso Regression)",
+    x = "Features",
+    y = "Coefficient"
+  ) +
+  theme_minimal()
+```
+Comparing the log-transformed model to the original model, the residuals appear to still be heteroscedastic. Normally, log transformations are used to stabilize variance and address heteroscedasticity, so if the opposite happens, it might signal specific underlying issues in the data or modeling process. We suspect that the heteroscedasticity observed in the log-transformed model is due to the non-linear amplification of errors when back-transforming predictions via exponentiation, as we've done in the code above. Residuals that are small in the log-space get magnified non-linearly when exponentiated, especially for larger predictions. By transforming back, errors become multiplicative in nature.
+
+In terms of feature importance, the log transformation stabilizes the coefficient scales, reducing the dominance of extreme coefficients. The influence of primary features like Session_Duration and Avg_BPM persists when compared to the previous, not log-transformed model, indicating their strong linear relationship even on the log scale.
+
+## Hypothesis Evaluation
+After testing several models, we have arrived at the Lasso Regression Model with interactions as the best model when using RMSE and R-squared as evaluation metrics. We will use this model to evaluate the hypothesis that age has a statistically significant effect on calories burned. Based on the feature importance graph from this model, we can observe that age is part of the top five most important features in terms of coefficient magnitude, along with session duration, average BPM, gender, and the interaction between session duration and average BPM. This is supported by current research, as a study from Duke University suggests that metabolism, or energy expenditure described by calories burned, does decline with age (Pontzer, 2021). That being said, the same study points out that human metabolisms decline at a much higher rate after age 60, which is above the maximum age in our dataset (Pontzer, 2021). Thus, this phenomenon could explain why age is not the *most* influential predictor in our model. After fitting a Lasso model, the terms that remain non-zero are the most influential predictors, overcoming the penalty for the bias-variance tradeoff. We can conclude that age does have a significant effect on calories burned, especially in comparison to most other variables in our dataset.
+
+## Conclusion
+Our research question was to determine which personal and exercise characteristics have the largest effect on calories burned during a workout, and how well we can use those characteristics to predict calories burned. We began by ensuring that our data was clean and balanced. The data did not contain missing values, and the categorical variances were balanced across classes. There were some variables that were highly correlated with each other, but we did not choose to remove any of them because our later modeling methods can resolve that issue. We also centered and scaled our data to prepare for the modeling steps. Our baseline models were linear regression models, one with interactions and one without, in which we used a combined stepwise approach to determine which variables to include. We found the linear regression model with interactions to perform significantly better, with a much lower RMSE and a lower AIC. This confirmed that the interactions between our predictors are important to account for. Our next methods were Lasso regression models because of their inherent feature selection capabilities. This involved four different models: Lasso, Lasso with interactions, Lasso on log-transformed data, and Lasso with interactions on log-transformed data. Out of these models, the Lasso with interactions performed the best, achieving an RMSE of 24.46 and an R-squared of 0.992. The feature importance analysis illustrated which predictors are the most influential in this model, where we found that session duration, average BPM, gender, and age are the most significant. This result validated our hypothesis that age would play a significant role for predicting calories burned. Overall, we conclude that the available predictors in the dataset are very effective in predicting how many calories will be burned in a workout. Some future directions could be to include more predictors, as well as testing the models on brand new data, especially because we are not sure how this data was collected, and in what environment. Our analysis could be more robust if we are able to validate our model performances on more data to ensure generalization.
+
+## References (for substantive knowledge)
+
+American Physiological Society. "Minutes of Hard Exercise Can Lead to All-Day Calorie Burn." ScienceDaily, 10 Oct. 2012, www.sciencedaily.com/releases/2012/10/121010161840.htm.
+
+Khorasani, Vala. Gym Members Exercise Dataset. Kaggle, 2024, www.kaggle.com/datasets/valakhorasani/gym-members-exercise-dataset/data.
+
+Pontzer, Herman. "Metabolism Changes With Age, Just Not When You Might Think." Duke Today, Duke University, 12 August 2021, today.duke.edu. https://today.duke.edu/2021/08/metabolism-changes-age-just-not-when-you-might-think.
+
+Schorr, M., et al. "Sex Differences in Body Composition and Association with Cardiometabolic Risk." Biology of Sex Differences, vol. 9, no. 28, 2018, doi:10.1186/s13293-018-0189-3.
+
+Waehner, Paige, "Calorie Burn Per Pound of Muscle." Verywell Fit, 2021, www.verywellfit.com/how-many-calories-does-muscle-really-burn-1231074.
+

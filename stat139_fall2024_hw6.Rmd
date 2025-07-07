@@ -1,0 +1,518 @@
+---
+title: "Problem Set 6"
+author: "STAT 139 (Fall 2024) Teaching Team"
+date: "Due Friday, November 1, 2024 at 11:59pm"
+output: pdf_document
+urlcolor: blue
+header-includes:
+  - \usepackage{hyperref}
+---
+
+
+
+
+\begin{small} 
+		
+\textbf{Problem set policies.} \textit{Please provide concise, clear answers for each question while making sure to fully explain your reasoning. For problems asking for calculations, show your work in addition to clearly indicating the final answer. For problems involving \texttt{R}, be sure to include the code and output in your solution.}
+
+\textit{Please submit the PDF of your knit solutions to Gradescope and be sure to assign which pages of your solution correspond to each problem. Make sure that the PDF is fully readable to the graders; e.g., make sure that lines don't run off the page margin.}
+
+\textit{We encourage you to discuss problems with other students (and, of course, with the teaching team), but you must write your final answer in your own words. Solutions prepared ``in committee'' are not acceptable. If you do collaborate with classmates on a problem, please list your collaborators on your solution. Be aware that simply copying answers found online, whether human-generated or machine-generated, is a violation of the Honor Code.}
+		
+\end{small}
+
+
+\clearpage
+
+
+### Question 1
+
+The file `pregnancydata.csv` includes several variables to model the birthweight of babies (measured through an online survey).  Those variables are defined below.  Use this dataset in \textsf{R} to answer the questions below:
+
+
+`id`: a unique identifier of the mother
+
+\vspace{-0.5em}
+
+`weight`: birthweight of the newborn baby, in ounces
+
+\vspace{-0.5em}
+
+`pregnancylength`: the length of the pregnancy, in days
+
+\vspace{-0.5em}
+
+`country`: where the birth took place; categories are United States (US), United Kingdom (UK), Canada (Can), and Other
+
+\vspace{-0.5em}
+
+`motherage`: age of mother at childbirth, in years
+
+\vspace{-0.5em}
+
+`multiples`: whether the baby was a 1=singleton or 2=twin
+
+\vspace{-0.5em}
+
+`sex`: sex of the baby: girl or boy
+
+\vspace{-0.5em}
+
+`induced`: a binary indicator for whether labor was induced with oxytocin
+
+\vspace{-0.5em}
+
+`cesarean`: a binary indicator for whether a cesarean (c-section) was performed
+
+\vspace{-0.5em}
+
+`previousbirths`: the number of births by the mother previous to this recorded one (from 0 to 10)
+
+
+\vspace{1em}
+
+\noindent \textbf{(a)} Fit a regression model to predict weight from country and use the `relevel` command to make the "Other" group the reference group (call this \textbf{Model 1}).  Interpret the results and provide a visual to support your conclusions.  
+
+```{r}
+library(readr)
+pregnancydata <- read.csv("data/pregnancydata.csv")
+pregnancydata <- as.data.frame(pregnancydata)
+```
+
+```{r}
+pregnancydata$country <- factor(pregnancydata$country)  # Convert to factor
+pregnancydata$country <- relevel(pregnancydata$country, ref = "Other")
+
+lm.a <- lm(weight ~ country, data = pregnancydata)
+summary(lm.a)
+```
+The 'Other' group is the intercept in this case. Thus, the average weight for a baby is 122.6570 outside of Canada, the U.S., and the U.K. Canadian and United Kingdom babies are higher than this average by 2.2965 and 0.9596, respectively. US babies are 1.3458 lower on average. However, there is only evidence that the US and Canadian babies differ from 'Other' based on a significance value of $\alpha = 0.05$.
+
+```{r}
+# visualize
+
+boxplot(weight ~ country, data = pregnancydata,
+        main = "Boxplot of Weights by Country with Significance Markers for p < 0.05",
+        xlab = "Country", ylab = "Weight",
+        col = c("grey", "red", "white", "blue"))
+
+segments(x0 = 1, x1 = 2, y0 = max(pregnancydata$weight)-15, y1 = max(pregnancydata$weight)-15, col = "black")
+text(x = 1.5, y = max(pregnancydata$weight) - 10, labels = "*", cex = 1.5, col = "red4")
+
+segments(x0 = 1, x1 = 4, y0 = max(pregnancydata$weight)-5, y1 = max(pregnancydata$weight)-5, col = "black")
+text(x = 2.5, y = max(pregnancydata$weight), labels = "*", cex = 1.5, col = "blue4")
+
+```
+
+
+\vspace{0.5em}
+
+\noindent \textbf{(b)} Build a $3^{rd}$ order polynomial regression model to predict weight from `pregnancylength` (call this **Model 2**). Interpret the output and provide a visual to support the results of the model.  
+
+```{r}
+model.2 <- lm(weight ~ pregnancylength + I(pregnancylength^2) + I(pregnancylength^3), data = pregnancydata)
+summary(model.2)
+```
+The intercept represents the weight when the pregnancy length is 0, which is not biologically meaningful. The first coeficient suggests that the weight decreases by -7.861 with each additional day of pregnancy. The positive second order coefficient suggests that the rate of decrease ...
+
+```{r}
+# visualize
+plot(weight ~ pregnancylength, data = pregnancydata,
+     pch = 1,
+     col = rgb(0, 0, 1, 0.2))
+
+# get list of x axis values and fit to get line
+pregnancy.x <- seq(min(pregnancydata$pregnancylength), max(pregnancydata$pregnancylength), length.out = 500)
+y.pred <- predict(model.2, newdata = data.frame(pregnancylength = pregnancy.x))
+lines(y.pred ~ pregnancy.x, col = 'red', lwd = 4)
+```
+
+\vspace{0.5em}
+
+\noindent \textbf{(c)} Use **Model 2** to estimate the probability that a baby will weigh less than 7 pounds (112 ounces) when born on day 280. 
+
+```{r}
+# estimate weight at day 280
+idx = pregnancydata$pregnancylength == 280
+
+# Use the model to predict weight at pregnancy length 280
+predicted.weight <- predict(model.2, newdata = pregnancydata[idx,], type = "response")
+predicted.weight[1]
+```
+```{r}
+# estimate probability that baby will weight less than 112 ounces using residual standard error 15.33 from above output
+pnorm(112, mean = predicted.weight[1], sd = 15.33) 
+```
+
+\vspace{0.5em}
+
+\noindent \textbf{(d)} It is of medical interest to determine at what gestational age a developing fetus is gaining weight the fastest.  Use **Model 2** to estimate this *period of fastest growth*.
+
+```{r}
+# plot X versus fitted values
+plot(model.2$fitted.values ~ pregnancydata$pregnancylength)
+```
+
+```{r}
+# get rate of change for each evenly spaced point along generated line of best fit
+roc <- diff(y.pred) / diff(pregnancy.x)
+
+# get value where roc is maxed
+pregnancydata$pregnancylength[which.max(roc)]
+```
+
+
+
+\clearpage
+
+### Question 2
+
+In this problem, we will attempt to investigate whether the COVID-19-related restrictions imposed by the government had any effect on the reporting of criminal activity in the Boston Police Department (BPD).  For this purpose, we will use the `bpd.csv` dataset, which includes the number of daily incident reports filed (`count`) and various weather indicators on those days (`maxtemp` is the only weather variable we will use in this problem).
+
+Note: a state of emergency was declared in Massachusetts on March 10, 2020, and restrictions on non-essential businesses, schools, and MBTA service were mainly put into effect on March 17,2020 (see this \href{https://www.boston.gov/departments/public-health-commission/coronavirus-timeline}{City of Boston article}
+ for the timeline). 
+
+The \textsf{R} chunk below reads in the data and includes some code to create a variable called `dayinyear` in the `bpd` data frame that counts the number of days into the year, starting with 0 for Jan 1.
+
+```{r}
+bpd = read.csv('data/bpd.csv')
+
+jan1_19 = as.Date("1/1/19",format="%m/%d/%y")
+jan1_20 = as.Date("1/1/20",format="%m/%d/%y")
+jan1_21 = as.Date("1/1/21",format="%m/%d/%y")
+
+bpd$dayinyear = as.Date(bpd$date,format="%m/%d/%y") - jan1_19 
+bpd$dayinyear[bpd$year==2020] =
+  as.Date(bpd$date,format="%m/%d/%y")[bpd$year==2020] - jan1_20 
+bpd$dayinyear[bpd$year==2021] =
+  as.Date(bpd$date,format="%m/%d/%y")[bpd$year==2021] - jan1_21
+```
+
+\vspace{0.5em}
+
+\noindent \textbf{(a)} Create a binary/dummy variable (call it `restrictions`) to indicate whether that day falls under the time period of state of emergency or restricted business operations in the city of Boston (all dates between and including March 10, 2020 and Friday, May 28, 2020).  How many days fall in this time period in the dataset?
+
+```{r}
+# make sure date column is Date obj
+bpd$date <- as.Date(bpd$date, format = "%m/%d/%y")
+
+# create 1s if date is past 
+bpd$restrictions <- ifelse(bpd$date > as.Date("3/17/20",format="%m/%d/%y") & bpd$date < as.Date("5/28/20",format="%m/%d/%y"), 1,0) 
+```
+
+```{r}
+# count number of days in time period
+paste("There are", sum(bpd$restrictions), "days under the time period of state of emergency or restricted business operations in the city of Boston")
+
+```
+
+
+
+\vspace{0.5em}
+
+\noindent \textbf{(b)} Calculate the mean number of daily incident reports filed by the BPD during the restriction orders in Boston.  Separately calculate the mean number of daily incident reports for a comparison group with the same calendar dates in the pre-pandemic portion of the data. Use these two groups to calculate a reasonable 95% confidence interval for the effect of COVID-19 restrictions on the reporting of crime in the BPD (based on a simple 2-group comparison method and not linear regression).
+
+```{r}
+# get index with restrictions
+idx.r <- bpd$restrictions == 1
+
+# get index in same date range for 2019
+idx.no.r <- (bpd$date > bpd$date[idx.r][1]-366) & (bpd$date <= bpd$date[idx.r][length(bpd$date[idx.r])]-366)
+
+#calculate mean for both
+mean.incidents.restriction <- mean(bpd$count[idx.r])
+mean.incidents.no.restriction <- mean(bpd$count[idx.no.r])
+paste("there are", mean.incidents.restriction, "mean daily incidents with restrictions and", mean.incidents.no.restriction, "daily incidents without restrictions")
+```
+
+```{r}
+t.test.restrictions <- t.test(bpd$count[idx.r], bpd$count[idx.no.r], conf.level = 0.95)
+
+cat("The 95% confidence interval for the effect of COVID-19 restrictions on the reporting of crime in the BPD:", 
+    t.test.restrictions$conf.int[1], "to", t.test.restrictions$conf.int[2])
+
+```
+
+
+\noindent \textbf{(c)} Fit a  linear regression model to predict `count` from `maxtemp` and `restrictions` (call it **model1**), and print out the `summary` results. Briefly interpret the coefficient estimates and use this model to estimate the effect of COVID-19 restrictions on the reporting of crime in the BPD (with 95% confidence).
+
+```{r}
+model1 <- lm(count ~ maxtemp + restrictions, data = bpd)
+summary(model1)
+```
+The average number of daily incidents with a maxtemp of 0 and no restrictions is 181.00327. One unit increase in maxtemp is associated with 0.70616 additional crimes per day. Restrictions present are associated with a reduction of 64.17608 daily incidents.
+
+```{r}
+#use this model to estimate the effect of COVID-19 restrictions on the reporting of crime in the BPD (with 95% confidence).
+
+conf.ints <- confint(model1, level = 0.95)
+cat("the effect of COVID-19 restrictions on the reporting of crime in the BPD (with 95% confidence) based on the model is", conf.ints['restrictions',1], "to ", conf.ints['restrictions',2])
+```
+
+
+
+\vspace{0.5em}
+
+\noindent \textbf{(d)} Fit a  linear regression model to predict `count` from `maxtemp`, `restrictions`, `dayinyear` and all 2-way interactions between these 3 predictors (call it **model2**), and print out the `summary` results.  Interpret what this model says about the effect of restrictions when \texttt{maxtemp}=0 and \texttt{dayinyear}=0 (point estimate only is fine).  Also provide a point estimate for `count` on the 91st day of the year in 2020, assuming the temperature was 50 degrees. Do the same for 2019 and compare the difference.
+
+```{r}
+bpd$dayinyear <- as.numeric(bpd$dayinyear)
+model2 <- lm(count ~ maxtemp + restrictions + dayinyear + maxtemp:restrictions + maxtemp:dayinyear + restrictions:dayinyear, data = bpd)
+summary(model2)
+```
+When maxtemp and dayinyear are both 0, COVID-19 restrictions are associated with a 92.49 decrease in daily incidents, making the number of incidents 192 - 92.49 = 99.51 when maxtemp and dayinyear are both 0.
+
+```{r}
+#Also provide a point estimate for `count` on the 91st day of the year in 2020, assuming the temperature was 50 degrees. Do the same for 2019 and compare the difference.
+
+# get subset for two categories
+data.subset1 <- data.frame(
+  maxtemp = c(50, 50),                 
+  dayinyear = c(91,91),              
+  restrictions = c(0, 1)  #only difference between two              
+)
+
+both.predictions <- predict(model2, newdata = data.subset1)
+
+cat("point estimate for `count` on the 91st day of the year in 2020, assuming the temperature was 50 degrees is:", both.predictions[1], "and the estimate for count on the 91st day of the year in 2019, assuming the temperature was 50 degrees is:", both.predictions[2], "the difference between the two is:", both.predictions[1] - both.predictions[2])
+```
+
+
+\vspace{0.5em}
+
+\noindent \textbf{(e)} Perform a formal hypothesis test to determine whether **model2** performs significantly better at predicting `count` than **model1**.
+
+```{r}
+model_comparison <- anova(model1, model2)
+print(model_comparison)
+```
+
+The following ANOVA fails to reject the null hypothesis that model1 and model2 fit the data equally.
+
+\vspace{0.5em}
+
+\noindent \textbf{(f)} Investigate the assumptions for **model2**. Be sure to include and reference useful visuals.
+
+```{r}
+# check for linearity, homoscedasticity 
+plot(model2, which = 1,)
+```
+The above residuals versus fitted plot shows a clear violation of homoscedasticity as the residuals widen towards the higher fitted values. The residuals look randomly dispersed around the mean of 0, implying linearity. 
+
+```{r}
+# check for Normality
+plot(model2, which=2)
+```
+The quantile-quantile plot shows that the standardized residuals have slightly lower tails than the theoretical normal distribution.
+
+```{r}
+par(mfrow=c(2,3))
+# check for independence by plotting residuals versus each X
+plot(bpd$maxtemp, residuals(model2), main="Residuals vs. Temp", xlab="Temp", ylab="Residuals")
+abline(h=0, col="red")
+
+plot(bpd$restrictions, residuals(model2), main="Residuals vs. Restrictions", xlab="Restrictions", ylab="Residuals")
+abline(h=0, col="red")
+
+plot(bpd$dayinyear, residuals(model2), main="Residuals vs. Day in Year", xlab="Restrictions",ylab="Day in Year")
+abline(h=0, col="red")
+
+#check for relationships between X's
+plot(bpd$maxtemp, bpd$restrictions, main='Temp vs. Restrictions', xlab="Temp", ylab="Restrictions")
+plot(bpd$maxtemp, bpd$dayinyear, main='Temp vs. Day in Year', xlab="Temp", ylab="Day in Year")
+plot(bpd$restrictions, bpd$dayinyear, main='Restrictions vs. Day in Year', xlab="Restrictions", ylab="Day in Year")
+
+
+
+```
+The residuals appear to be randomly dispersed along mean 0 for all 3 independent variables, suggesting independence among residuals. However, the below plots show some collinearity among X's, like Temperature vs. Day in Year.
+
+\vspace{0.5em}
+
+\noindent \textbf{(g)} Determine on which four dates **model2** did the worst job at predicting `count`. 
+
+```{r}
+# find highest abs value of residuals at points in model
+
+bpd$residuals.model2 <- abs(residuals(model2))
+bpd.sorted <- bpd[order(bpd$residuals.model2),]
+
+idx <- as.numeric(row.names(tail(bpd.sorted, 4)))
+
+print("the dates where model2 has the highest absolute residual values and thus did the worst job at predicting 'count':")
+print(bpd[idx, 1])
+
+```
+
+
+\vspace{0.5em}
+
+\noindent \textbf{(h)} Write a short (200-300 word) summary addressing whether there is evidence that COVID-19 reduced the amount of crime in Boston.  Be sure to reference the results above (specifically, which approach you think was most reasonable) and mention any biases or confounders that may be present in this relationship.
+
+Yes, the results show that COVID-19 reduced the amount incidents per day in Boston. I think the approach from (c) with just restrictions and maxtemp is the most reasonable due to the clear collinearity between 'maxtemp' and 'dayinyear'. Additionally, the model with pairwise interaction terms did not show significance for all added interaction terms, which could lead to redundancy and overfitting. Each subsequent model showed a statistical difference between incidents per day on days with restrictions versus days without. Firstly, we performed a two sample t-test, holding the day of the year constant in part b, where we showed a clear difference between the means and that both bounds of the 95% confidence interval for mean difference were negative. The linear regression in part c also yielded negative bounds for the confidence intervals, indicating significance. In part d, we fit another linear regression model with all two-way interaction terms and computed a point estimate holding other parameters constant while only changing the significant 'restrictions' parameter, which yielded different values for the same day and temperature in 2019 and 2020, respectively. 
+
+The fitted versus residual plots in part f show the binary clustering occurring in this chart, which suggests effects of 'restrictions'. However, some confounders that were included in the model like collinear 'maxtemp' and 'dayinyear' may affect this relationship. Additionally, 'restrictions' may mask a true, more specific causal effect not present in the model or the data like 'police activity' or 'store closures'.
+
+
+\clearpage
+
+### Question 3 (Faraway, Chapter 3 Problem 3)
+
+The `cheddar` dataset (in the `faraway` package) contains data on a study of cheddar cheese from the LaTrobe Valley of Victoria, Australia (you might have used this dataset in the our last problem set). Thirty samples of cheddar cheese were analyzed for their content of acetic acid, hydrogen sulfide and lactic acid. Each sample was tasted and scored by a panel of judges and the average taste score produced. Use the `cheddar` dataset to answer the following:
+
+
+\noindent \textbf{(a)} Fit a regression model with taste as the response and the three chemical contents as predictors. Identify the predictors that are statistically significant at the 5\% level.
+
+```{r}
+library(faraway)
+lm.3a <- lm(taste ~ Acetic + H2S + Lactic, data = cheddar)
+summary(lm.3a)
+```
+
+H2S and Lactic are significant at the $\alpha = 0.05$  significance level.
+
+\noindent \textbf{(b)} `Acetic` and `H2S` are measured on a log scale. Fit a linear model where all three predictors are measured on their original scale. Identify the predictors that are statistically significant at the 5\% level for this model.
+
+```{r}
+lm.3b <- lm(taste ~ log(Acetic) + log(H2S) + log(Lactic), data = cheddar)
+summary(lm.3b)
+```
+H2S and Lactic are signifiant at the $\alpha = 0.05$  signifiance level.
+
+
+\noindent \textbf{(c)} Can we use an $F$-test to compare these two models? Explain. Which model provides a better fit to the data? Explain your reasoning.
+
+```{r}
+anova.3c <- anova(lm.3a, lm.3b)
+print(anova.3c)
+```
+We cannot perform a nested F-test because no additional predictors are added. F-tests can be used to compare nested models rather than models that are just transformations of the same terms. The first model, the one without the log-transformation, has a lower residual sum of squares, suggesting that it is the better model.
+
+\noindent \textbf{(d)} If `HS2` is increased 0.01 for the model used in part \textbf{(a)}, what change in the `taste` would be expected?
+
+```{r}
+summary(lm.3a)
+```
+If `HS2` is increased 0.01 for the model used in part \textbf{(a)}, 'taste' would change by 3.9118 * 0.01 = 0.039118 if the other predictors are held constant.
+
+\noindent \textbf{(e)} What is the percentage change in `H2S` on the original scale corresponding to an additive increase of 0.01 on the (natural) log scale?
+
+additive increase of 0.01 on the (natural) log scale:
+$$
+ln(\hat\beta) + 0.01 = ln(\hat\beta) + ln(e^{0.01}) 
+$$
+$$
+ln(\hat\beta * e^{0.01})
+$$
+additive increase on original scale:
+$$
+\hat\beta * e^{0.01}
+$$
+percent change:
+$$
+\frac{ \hat\beta * e^{0.01} - \hat\beta}{\hat\beta} * 100
+$$
+
+
+$$
+\frac{ \hat\beta(e^{0.01} - 1)}{\hat\beta} * 100
+$$
+
+$$
+(e^{0.01} - 1) * 100 
+$$
+$101.005$ % increase  
+
+\clearpage
+
+
+### Question 4 (Based on Faraway, Chapter 3 Problem 6)
+
+The `happy` dataset (in the `faraway` package) contains data on happiness from a sample of 39 students collected in a University of Chicago MBA class  (you might have used this dataset in our last problem set). The students were asked about happiness and how this related to their income and social life. Fit a model with `happy` as the dependent variable, and the other four variables as independent variables.
+
+
+\noindent \textbf{(a)} Which predictors are statistically significant at the 1\% level. 
+
+```{r}
+lm.4a <- lm(happy ~ ., data = happy)
+summary(lm.4a)
+```
+
+love is the only significant predictor with an $\alpha = 0.01$
+
+\noindent \textbf{(b)} Implement a permutation procedure to test the significance of the `money` predictor.  Do not use any existing packages here, write your own code instead.
+
+```{r}
+# get coefficient for money
+set.seed(11)
+beta.money <- coef(lm.4a)['money']
+
+# create df of 100 random samples
+samples <- sapply(1:100, function(x) sample(happy$money))
+samples <- data.frame(samples)
+
+# loop through each sample and create list of models and their coefs for money
+lms <- vector("list", 100)
+permuted.tvals <- c()
+
+for(i in 1:100){
+  happy$sample <- samples[,i]
+  lm.sample <- lm(happy ~ sex + love + work + sample, data = happy)
+  lms[[i]] <- summary(lm.sample)
+  permuted.tvals <- c(permuted.tvals, lms[[i]]$coefficients['sample',3])
+
+}
+```
+
+```{r}
+# get p value for coefficients of permutation procedure by getting proportion of sampled t values higher than norma
+table.4a <- summary(lm.4a)
+p.value <- mean(abs(permuted.tvals) >= abs(table.4a$coefficients['money',3]))
+
+cat("the p value of", p.value, "suggests that the association between money and happiness in the dataset is due to chance")
+```
+
+
+
+\noindent \textbf{(c)} Create a histogram of the permutation $t$-statistics. Make sure to use the probability rather than frequency version of the histogram. 
+
+```{r}
+hist(permuted.tvals, prob=T)
+```
+
+
+\noindent \textbf{(d)} Overlay an appropriate $t$-distribution over your histogram. Hint: Use `grid <- seq(-3, 3, length = 300)` to create a grid of values, then use the `dt` function to compute the $t$-density over this grid and the `lines` function to superimpose the result.
+
+```{r}
+grid <- seq(-3, 3, length = 300)
+
+# 34 df from above table.4a
+theoretical.dist <- dt(grid, df=34)
+hist(permuted.tvals, prob=T)
+lines(grid,theoretical.dist, col='red')
+```
+
+
+\noindent \textbf{(e)} Implement a bootstrap procedure to compute 90\% and 95\% confidence intervals for $\beta_{\text{money}}$. Do not use any existing packages here, write your own code instead. Does zero fall within these confidence intervals? Are these results consistent with the previous tests?
+
+```{r}
+# bootstrapping samples with replacement (different from above permutations)
+samples <- sapply(1:100, function(x) sample(happy$money, replace = T))
+samples <- data.frame(samples)
+b.coefs <- c()
+
+bootstraps <- vector("list", 100)
+for (i in 1:100){
+  happy$sample <- samples[,i]
+  bootstraps[[i]] <- summary(lm(happy ~ sex + love + work + sample, data = happy))
+  b.coefs <- c(b.coefs, bootstraps[[i]]$coefficients['sample',3])
+}
+```
+
+```{r}
+# now we have 100 coefficients, calculate quantiles for both intervals
+cat("the 90% confidence interval bounds: ", quantile(b.coefs, probs = c(0.05, 0.95)), "\n")
+cat("the 95% confidence interval bounds: ", quantile(b.coefs, probs = c(0.025, 0.975)))
+```
+
+0 falls between both confidence intervals, which suggests that money is an insignificant predictor of happiness in this sample of UChicago MBA students. This result is consistent with the previous initial significance value > $\alpha = 0.05$ and the permutation test that suggested that there is a probability greater than $\alpha = 0.05$ of observing a test statistic under the null that is more extreme than the original test statistic. 

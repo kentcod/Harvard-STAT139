@@ -1,0 +1,448 @@
+---
+title: "Problem Set 7"
+author: "STAT 139 (Fall 2024) Teaching Team"
+date: "Due Friday, November 15, 2024 at 11:59pm"
+output: pdf_document
+urlcolor: blue
+---
+
+
+
+
+\begin{small} 
+		
+\textbf{Problem set policies.} \textit{Please provide concise, clear answers for each question while making sure to fully explain your reasoning. For problems asking for calculations, show your work in addition to clearly indicating the final answer. For problems involving \texttt{R}, be sure to include the code and output in your solution.}
+
+\textit{Please submit the PDF of your knit solutions to Gradescope and be sure to assign which pages of your solution correspond to each problem. Make sure that the PDF is fully readable to the graders; e.g., make sure that lines don't run off the page margin.}
+
+\textit{We encourage you to discuss problems with other students (and, of course, with the teaching team), but you must write your final answer in your own words. Solutions prepared ``in committee'' are not acceptable. If you do collaborate with classmates on a problem, please list your collaborators on your solution. Be aware that simply copying answers found online, whether human-generated or machine-generated, is a violation of the Honor Code.}
+		
+\end{small}
+
+
+\clearpage
+
+
+
+
+### Question 1
+
+There are two datasets included that will be used for this problem:
+
+- a training dataset called `bosflights18.csv` which includes data on a subset of flights ($n=10,000$) in and out of Boston's Logan Airport in the year 2018. 
+
+- a test dataset called `bosflights18_test.csv` (note it is actually larger in size than `bosflights18.csv`)
+
+The important variables in these datasets are:
+
+\footnotesize
+
+`flight_time`: the total amount of time the flight takes from the time the plane takes off until the time it arrives at the destination gate.
+
+`year`: year of flight (they are all from 2018)
+
+`month`: month: 1 = January, 2 = February, etc.
+
+`dayofmonth`: the calendar day of the month, from 1 to 31.
+
+`weekday`: day of the week: 1 = Monday, 2 = Tuesday, etc.
+
+`carrier`: the unique 2-digit carrier code of the flight. For details, see the list here: \url{https://en.wikipedia.org/wiki/List_of_airlines_of_the_United_States}
+
+`tailnum`: the unique tail number of the aircraft
+
+`flightnum`: the carrier's specific flight number
+
+`origin`: the originating airport.  See \url{http://www.leonardsguide.com/us-airport-codes.shtml}.
+
+`dest`: the destination airport.
+
+`bos_depart`: an indicator if the flight departed out of Boston.
+
+`schedule_depart`: the scheduled departure time in minutes across the day ranging from 0 to 1439.  7pm is 1140, for example.
+
+`depart`: the actual departure time (in minutes)
+
+`wheels_off`: the time of day the plane took off (in minutes)     
+
+`distance`: the distance of the flight, in miles.
+
+`weather_delay`: an indicator if the delay is due to extreme weather.
+
+`nas_delay`: an indicator if the delay is due to the national aviation system (air traffic control, for example).
+
+`security_delay`: an indicator if the delay is due to a security issue at the terminal.
+
+`late_aircraft_delay`: an indicator if the delay is due to a late arrival of a previous flight with the same aircraft.
+
+`carrier_delay`: an indicator if the delay is due to a carrier (kind of a catch all if not the others).
+
+\normalsize
+
+More info on the delay indicators can be found at the Bureau of [Transportation Statistics (BTS)](https://www.bts.gov/topics/airlines-and-airports/airline-time-performance-and-causes-flight-delays).  
+
+We want to predict `flight_time` (untransformed) based on all of the other predictors in the data set (all other variables could be measured at some point before the flight takes off). 
+
+\vspace{0.1in}
+
+
+\clearpage
+
+\noindent \textbf{(a)} Fit the following three linear models and for each report (1) $R^2$ on the training data, (2) the number of non-`NA` $\beta$ estimates in the training model, and (3) the number of `NA` $\beta$ estimates in the training model: 
+
+```{r}
+#load dependencies and read in data
+library(readr)
+library(magrittr)
+library(glmnet)
+bosflights18 <- read_csv("data/bosflights18.csv")
+```
+
+
+- **lm1** that predicts flight time from the main effects of all of the included predictors (untransformed quantitative predictors, but be sure to handle categorical predictors appropriately).
+
+```{r}
+bosflights18 <- bosflights18[,-(c(2,4,6,7))] #get rid of specified cols
+lm1 <- lm(flight_time ~ . ,data = bosflights18)
+summary.lm1 <- summary(lm1)
+summary.lm1
+```
+The R-squared says the model explains 
+```{r}
+summary.lm1$r.squared
+```
+
+of the variance in flight time.  
+
+There are 
+
+```{r}
+summary.lm1$coefficients[,1] %>% length()
+```
+
+non-`NA` $\beta$ estimates in the training model. And there are 2 `NA` $\beta$ estimates in the training model based on the above summary output.
+
+- **lm2** that predicts flight time from the main effects of all of the included predictors but treats `distance` with a $15^{th}$ order polynomial function (in this case, do NOT use the `raw=T` argument in `poly`).
+
+```{r}
+lm2 <- lm(flight_time ~ . + poly(distance,15),data = bosflights18)
+summary.lm2 <- summary(lm2)
+summary.lm2
+```
+The R-squared says the model explains 
+```{r}
+summary.lm2$r.squared
+```
+of the variance in flight time.  
+
+There are 
+
+```{r}
+summary.lm2$coefficients[,1] %>% length()
+```
+
+non-`NA` $\beta$ estimates in the training model. And there are 3 `NA` $\beta$ estimates in the training model based on the above summary output.
+
+- **lm3** that predicts flight time from the main effects (treating `distance` with a $15^{th}$ order polynomial function) and the interactions of `bos_depart` with all the other predictors (including all polynomial terms of `distance`) [ignore other interactions].  
+
+```{r}
+lm3 <- lm(flight_time ~ . + poly(distance, 15) + (.-distance)*bos_depart, data = bosflights18)
+summary.lm3 <- summary(lm3)
+summary.lm3
+```
+The R-squared says the model explains 
+```{r}
+summary.lm3$r.squared
+```
+of the variance in flight time.  
+
+There are 
+
+```{r}
+summary.lm3$coefficients[,1] %>% length()
+```
+
+non-`NA` $\beta$ estimates in the training model. And there are
+```{r}
+coef(lm3) %>% is.na %>% sum
+```
+`NA` $\beta$ estimates in the training model based on the above summary output.
+
+
+**Note**: you should completely ignore 4 variables here: `year`, `day_of_month`, `flightnum`, and `tailnum`.
+
+\vspace{1em}
+
+\noindent \textbf{(b)} Why are there `NA` estimates (be specific to this dataset)?
+
+In the summary output, R explains that 43 coefficients are not defined because of singularities. Thus, when $(X^T X)^{-1}$ within the OLS parameter estimation formula $\beta = (X^T X)^{-1} X^T Y$ is not invertible and therefore singular, the $\beta$ coefficients cannot be estimated. This typically occurs due to collinearity/Linear Dependence within the predictor variables.
+
+\vspace{1em}
+
+\noindent \textbf{(c)} Evaluate the three models in part (a) based on RMSE on both the train and test sets.  Interpret the results as to which model is best for prediction and which models may be overfit.
+```{r}
+#read in test data
+bosflights18.test <- read_csv("data/bosflights18_test.csv")
+bosflights18.test <- bosflights18.test[,-(c(2,4,6,7))] #get rid of specified cols
+
+#test columns match
+all(colnames(bosflights18.test) == colnames(bosflights18))
+```
+
+
+```{r}
+# residuals are difference between predicted and observed values
+lm1.rmse.train <- sqrt(mean(lm1$residuals^2))
+
+# use predict function to predict values on test set with trained lm
+lm1.rmse.test <- sqrt(mean((predict(lm1, newdata = bosflights18.test)-bosflights18.test$flight_time)^2))
+
+lm2.rmse.train <- sqrt(mean(lm2$residuals^2))
+lm2.rmse.test <- sqrt(mean((predict(lm2, newdata = bosflights18.test)-bosflights18.test$flight_time)^2))
+
+lm3.rmse.train <- sqrt(mean(lm3$residuals^2))
+lm3.rmse.test <- sqrt(mean((predict(lm3, newdata = bosflights18.test)-bosflights18.test$flight_time)^2))
+```
+
+##### Interpretation
+
+Based on minimizing the RMSE loss metric, *lm3* is the best model based on both the train and the test set. Interestingly, there is not a large difference between the train and test set for each model, so it is difficult to determine if overfitting occurred just by observing the train and test set. It may be more useful to cross-validate each model over multiple train and validation sets before fitting on the test set to determine if the more complex models in *lm2* and *lm3* are overfitting.
+
+\clearpage
+
+
+### Question 2
+
+\noindent \textbf{(a)} Fit well-tuned Ridge and LASSO regression models using `cv.glmnet` based on the predictors used in the **lm3** model from the previous problem. Hint: the \textsf{R} command `model.matrix` may be helpful to get you started.
+
+```{r}
+X = model.matrix(lm3)[,-1]
+cvfit.ridge = cv.glmnet(X,bosflights18$flight_time, alpha = 0,standardize = T)
+
+# get lambda that minimizes MSE
+opt.l.ridge <- cvfit.ridge$lambda.min
+opt.l.ridge
+```
+```{r}
+# just change alpha arg to 1 for LASSO
+cvfit.lasso = cv.glmnet(X,bosflights18$flight_time, alpha = 1,standardize = T)
+
+opt.l.lasso <- cvfit.lasso$lambda.min
+opt.l.lasso
+```
+
+
+\vspace{1em}
+
+\noindent \textbf{(b)} For both the Ridge and LASSO models, plot the average MSE on the validation sets against the $\lambda$'s you considered in the previous part. Report the best $\lambda$'s. (This part should require almost no work if you did part (a)).
+
+```{r}
+plot(cvfit.ridge,
+     main = 'Ridge lambda versus cross-validated MSE')
+```
+```{r}
+plot(cvfit.lasso,
+     main = 'LASSO lambda versus cross-validated MSE')
+```
+
+
+\vspace{1em}
+
+\noindent \textbf{(c)} Provide the "$\widehat{\beta}$ trajectory" plots of the main effects from these models (plot each $\beta_j$ as a function of $\lambda$ as a curve, and do this for all main/linear effects). Interpret what you see in 2-3 sentences.
+
+```{r}
+# get X for ONLY main effects from these models (since lm1 is simple model with only main effects)
+X <- model.matrix(lm1)[,-1]
+```
+
+
+```{r}
+ridges = glmnet(X, bosflights18$flight_time, alpha = 0,nlambda=100)
+matplot(log(ridges$lambda,10),t(ridges$beta),type="l",col="gray33",lwd=1,
+        xlab=expression(log_10(lambda)),ylab=expression(hat(beta)), 
+        main = 'Beta trajectory for ridge')
+abline(h=0, col = 'red')
+```
+
+
+```{r}
+
+lassos = glmnet(X, bosflights18$flight_time, alpha = 1,nlambda=100)
+matplot(log(lassos$lambda,10),t(lassos$beta),type="l",col="gray33",lwd=1,
+        xlab=expression(log_10(lambda)),ylab=expression(hat(beta)),
+        main = 'Beta trajectory for LASSO')
+abline(h=0, col = 'red')
+```
+LASSO is known for coercing coefficients to 0 and performing model selection due to the geometry of absolute value as observed in class when minimizing the loss function. This is clearly shown here with all $\widehat{\beta}$'s being coerced to zero at a certain threshold of log_10($\lambda$) in LASSO and only approaching zero as log_10($\lambda$) increases in Ridge.
+
+\vspace{1em}
+
+\noindent \textbf{(d)} Choose a best regularized/penalized regression model and briefly justify your choice. Revisit the grid of $\lambda$'s that were used (either explicitly by you, or automatically by `R`) and comment on whether it's obvious that these penalized models will predict better than the original model.
+
+```{r}
+# fit glmnet with optimal lambda for ridge and lasso and compute test RMSE
+ridge = glmnet(X, bosflights18$flight_time, alpha = 0,lambda=opt.l.ridge)
+lasso = glmnet(X, bosflights18$flight_time, alpha = 1,lambda=opt.l.lasso)
+
+# compare test RMSE with original lm3
+X.test <- model.matrix(lm1, data = bosflights18.test)
+
+# get rid of intercept in newx
+ridge_pred <- predict(ridge, s = opt.l.ridge, newx = X.test[,-1])
+lasso_pred <- predict(lasso, s = opt.l.lasso, newx = X.test[,-1])
+
+rmse.test.ridge <- sqrt(mean((ridge_pred - bosflights18.test$flight_time)^2))
+rmse.test.lasso <- sqrt(mean((lasso_pred - bosflights18.test$flight_time)^2))
+```
+
+Based on the Root Mean Squared Error calculated for both ridge and lasso on the test versus the original models without regularization, the original models perform better on the test set even after cross-validating to find the best value of lambda.
+
+```{r, warning = FALSE}
+set.seed(139)
+ nsims = 3
+ n = nrow(bosflights18)
+ lambdas=10^(seq(-5,5,0.1))
+ sse_ridge = sse_lasso = matrix(NA,nrow=nsims,ncol=length(lambdas))
+ for(i in 1:nsims){
+   reorder=sample(n)
+   train=bosflights18[reorder[1:8000],]
+   test=bosflights18[reorder[8000:n],]
+   X_train = X[reorder[1:8000],]
+   X_test = X[reorder[8001:n],]
+   #calculate lasso & ridge regressions
+   lassos = glmnet(X_train,train$flight_time, alpha = 1,lambda=lambdas)
+   ridges = glmnet(X_train,train$flight_time, alpha = 0,lambda=lambdas)
+   #calculate yhats for test set to get SSEs in test set
+   yhat_test_ridges <- predict(ridges, X_test, s = lambdas)
+   yhat_test_lassos <- predict(lassos, X_test, s = lambdas)
+   sse_ridge[i,]=apply((test$flight_time-yhat_test_ridges)^2,2,sum)
+   sse_lasso[i,]=apply((test$flight_time-yhat_test_lassos)^2,2,sum)
+}
+```
+
+
+```{r}
+results=cbind(lambdas,mean_sse_lasso<-apply(sse_lasso,2,mean),
+ mean_sse_ridge<-apply(sse_ridge,2,mean))
+```
+
+```{r}
+#Revisit the grid of $\lambda$'s that were used
+ylimits = c(min(mean_sse_ridge,mean_sse_lasso),max(mean_sse_ridge,mean_sse_lasso))
+xlimits = log(c(min(lambdas),max(lambdas)),10)
+
+plot(mean_sse_lasso~log(lambdas,10),type="l",col="red3",ylim=ylimits,
+ xlim=xlimits,main="LassomeanSSEin validationsets")
+ plot(mean_sse_ridge~log(lambdas,10),type="l",col="blue3",ylim=ylimits,
+ xlim=xlimits,main="RidgemeanSSEin validationsets")
+```
+
+\clearpage
+
+However, Revisiting the grid of $\lambda$'s that were used, it is clear that the regularized models perform better on the validation set. Given this information, the regularized model would still be chosen over the original model assuming that the test set is withheld during model selection. That being said, the RMSE for the test set is lower for the regularized models with optimal lambdas chosen by R's cross-validation glmnet function. Could this be due to randomness with an 'unlucky' test set? Or, could the regularized model be underfit on the train set even in the case of low validation MSE given that the test set in this case contains over 70000 observations while the train set only has 10000.
+
+
+
+\clearpage
+
+### Question 3: Work on your EDA
+
+Question 3 allows you to start working on your final project EDA. Thus, if you find any issues with your data, you will be aware early! Evaluate the quality of your data by creating a table which, for each important continuous variable in your dataset reports:
+
+```{r}
+gym.data <- read_csv("data/gym_members_exercise_tracking.csv")
+```
+```{r warning=FALSE}
+# apply na function to df
+column.non.nas <- !sapply(gym.data, FUN = is.na)
+column.nas <- sapply(gym.data, FUN = is.na)
+
+# create function to determine if categorical 
+get.levels <- function(df) {
+  # returns levels if categorical (experience level is also categorical), NA if not
+  if (is.character(df) || length(unique(df)) <= 3) {
+    return(toString(unique(df)))
+  } else {
+    return(NA)
+  }
+}
+
+# create function to count NA instances of categorical variable levels
+count.na <- function(col){
+  # returns non-missing: missing ratio if categorical, NA if not
+  if (is.character(gym.data[[col]]) || col == 'Experience_Level') {
+    level.counts <- c()
+    for (level in unique(gym.data[[col]])){
+      non.missing <- sum(!sapply(gym.data[,col][gym.data[,col] == level], is.na ))
+      missing <- sum(sapply(gym.data[,col][gym.data[,col] == level], is.na ))
+      level.counts <- c(level.counts, paste0(level,' ',non.missing,':', missing))
+    }
+    return(toString(level.counts))
+  } else {
+    return(NA)
+  }
+}
+
+summary.table <- data.frame(
+  Non.missing.obs = colSums(column.non.nas),
+  missing.obs = colSums(column.nas),
+  mean = sapply(gym.data, FUN = mean),
+  median = sapply(gym.data, FUN = median),
+  std.dev = sapply(gym.data, FUN = sd),
+  levels = sapply(gym.data, FUN = get.levels),
+  nonmissing.missing.ratio = sapply(colnames(gym.data), FUN = count.na)
+)
+
+write.csv(summary.table, file = "data/gym_summary_table.csv")
+```
+- The number of non-missing observations
+
+- The  number of missing observations
+
+- A measure(s) of the central tendency (i.e., mean, media)
+
+- A measure(s) of variability (i.e, sd, IQR)
+
+and for each important categorical variable in your dataset reports:
+
+- The levels of the variable
+
+- For each level:
+  
+  - The number of non-missing observations
+  
+  - The number of missing observations
+```{r}
+print(summary.table)
+```
+
+
+
+### correlation matrix for numeric variables
+
+```{r}
+# get numeric data
+gym.numeric <- gym.data %>% select(-Workout_Type, -Gender)
+cor(gym.numeric)
+```
+
+
+### plots for highly correlated variables/ variables with potential effects from substantive knowledge
+
+```{r}
+plot(BMI ~ Fat_Percentage,data = gym.data, bg = rgb(1, 0, 0, alpha = 0.2), pch = 25, col = NA)
+plot(BMI ~ `Water_Intake (liters)`, data = gym.data, bg = rgb(0, 1, 0, alpha = 0.2), pch = 25, col = NA)
+plot(gym.data$BMI ~ gym.data$`Weight (kg)`, bg = rgb(0, 1, 0, alpha = 0.2), pch = 25, col = NA)
+boxplot(BMI ~ Experience_Level, data = gym.data, col = 'blue')
+plot(BMI ~ Calories_Burned, data = gym.data, bg = rgb(1, 0, 1, alpha = 0.2), pch = 25, col = NA)
+plot(BMI ~ Max_BPM, data = gym.data, bg = rgb(0, 1, 1, alpha = 0.2), pch = 25, col = NA)
+plot(BMI ~ `Height (m)`, data = gym.data, bg = rgb(0, 1, 1, alpha = 0.2), pch = 25, col = NA)
+```
+
+```{r}
+# save cor matrix to csv
+cor.matrix <- cor(gym.numeric)
+write.csv(cor.matrix, file = 'data/correlation_matrix.csv')
+```
+
+Weight, water, fat, and height are the most highly correlated.

@@ -1,0 +1,352 @@
+---
+title: "Problem Set 8"
+author: "STAT 139 (Fall 2024) Teaching Team"
+date: "Due Friday, December 6, 2024 at 11:59pm"
+output: pdf_document
+urlcolor: blue
+---
+
+
+
+
+\begin{small} 
+		
+\textbf{Problem set policies.} \textit{Please provide concise, clear answers for each question while making sure to fully explain your reasoning. For problems asking for calculations, show your work in addition to clearly indicating the final answer. For problems involving \texttt{R}, be sure to include the code and output in your solution.}
+
+\textit{Please submit the PDF of your knit solutions to Gradescope and be sure to assign which pages of your solution correspond to each problem. Make sure that the PDF is fully readable to the graders; e.g., make sure that lines don't run off the page margin.}
+
+\textit{We encourage you to discuss problems with other students (and, of course, with the teaching team), but you must write your final answer in your own words. Solutions prepared ``in committee'' are not acceptable. If you do collaborate with classmates on a problem, please list your collaborators on your solution. Be aware that simply copying answers found online, whether human-generated or machine-generated, is a violation of the Honor Code.}
+		
+\end{small}
+
+
+\clearpage
+
+
+### Question 1
+
+Consider the following model:
+
+\[ Y_{ij} = \beta_0 + \alpha_j + \beta_1 x_{ij} + \varepsilon_{ij} \] 
+\[ i=1,\dots, n_j \]
+\[j=1, \dots, J\]
+\[\alpha_j \sim N(0,\sigma_\alpha^2) \perp\!\!\!\perp \varepsilon_{ij} \sim N(0,\sigma_{\varepsilon}^2) \]
+
+\vspace{1em}
+
+\noindent \textbf{a)} Compute $\text{Var}(Y_{ij})$.
+
+$$
+Var(y_{ij}) = Var(\beta_0 + \alpha_j + \beta_1 x_{ij} + \varepsilon_{ij})
+$$
+Since $beta_0$ and $beta_1$ are constants with zero variance.
+
+$$
+Var(y_{ij}) = Var(\alpha_j + \varepsilon_{ij})
+$$
+
+$$
+Var(y_{ij}) = \sigma_{\alpha}^2 + \sigma_{\varepsilon}^2
+$$
+
+\noindent \textbf{b)} Compute $\text{Cov}(Y_{ij}, Y_{i'j'})$ where $i' \ne i$ and $j' \ne j$.
+
+$$
+Cov(Y_{ij}, Y_{i'j'}) = Cov(\beta_0 + \alpha_j + \beta_1 x_{ij} + \varepsilon_{ij}, \beta_0 + \alpha_{j'} + \beta_1 x_{i'j'} + \varepsilon_{i'j'})
+$$
+
+using same constant variance assumption from a)
+
+$$
+ = Cov(a_j, a_{j'}) + Cov(a_j, \varepsilon_{i'j'}) + Cov(\varepsilon_{ij}, a_{j'} ) + Cov(e_{ij}, e_{i'j'})
+$$
+
+Since $i' \ne i$ and $j' \ne j$, all variance terms above are independent
+
+$$
+Cov(Y_{ij}, Y_{i'j'}) = 0
+$$
+
+\noindent \textbf{c)} Compute $\text{Cov}(Y_{ij}, Y_{i'j})$ where $i' \ne i$.
+
+$$
+Cov(Y_{ij}, Y_{i'j}) = Cov(\beta_0 + \alpha_j + \beta_1 x_{ij} + \varepsilon_{ij}, \beta_0 + \alpha_{j} + \beta_1 x_{i'j} + \varepsilon_{i'j})
+$$
+
+$$
+ = Cov(a_j, a_{j}) + Cov(a_j, \varepsilon_{i'j}) + Cov(\varepsilon_{ij}, a_{j} ) + Cov(e_{ij}, e_{i'j})
+$$
+from the same independence logic as b) for $i' \ne i$
+
+$$
+Cov(Y_{ij}, Y_{i'j}) = Var(a_j)
+$$
+
+$$
+Cov(Y_{ij}, Y_{i'j}) = \sigma_{\alpha}^2
+$$
+
+\noindent \textbf{d)} The ratio of the answer to c) and the answer to a) is called the **intraclass correlation coefficient**. Explain in a sentence or two what this measures.
+
+the ratio is $\frac{\sigma_{\alpha}^2}{\sigma_{\alpha}^2 + \sigma_\varepsilon^2}$, which represents the proportion of variation that occurs within groups defined by j random intercepts.
+
+\clearpage
+
+### Question 2
+
+The dataset `growth.csv` contains a certain type of growth data on a sample of 11 girls and 16 boys. Specifically, in this study, the distance between the center of the pituitary to the pteryomaxillary fissure (a teardrop-shaped opening located in the human skull) was measured at four occasions: at 8, 10, 12 and 14 years. The variables in the dataset are:
+
+\vspace{1em}
+
+`subjid`: a unique subject identifier
+
+`sex`: the sex of each child
+
+`distance_8`: the distance (in mm) at age 8
+
+`distance_10`: the distance (in mm) at age 10
+
+`distance_12`: the distance (in mm) at age 12
+
+`distance_14`: the distance (in mm) at age 14
+
+\vspace{1em}
+
+\noindent \textbf{a)} The data are currently in  "wide" format. Wrangle the dataset into "long" format that is suitable for analysis with, for example, the `lmer()` function. That is, there should be a column for age, and another for `distance`.
+
+```{r}
+library(readr)
+library(lme4)
+library(tidyverse)
+library(lmerTest)
+
+growth <- read_csv("data/growth.csv")
+
+# Reshape from wide to long format using pivot_longer
+growth.long <- pivot_longer(
+  growth,
+  cols = starts_with("distance"),  # Selects all columns that start with 'distance'
+  names_to = "age",                # New column for the ages
+  names_prefix = "distance_",      # Removes the prefix from the original column names
+  values_to = "distance"           # New column for the distances
+)
+
+# Convert the 'age' column to a numeric type
+growth.long$age <- as.numeric(growth.long$age)
+```
+
+
+\noindent \textbf{b)} Plot these data longitudinally, using different colored series for males and females. Comment on any strange observations you observe.
+
+```{r}
+plot(growth.long,
+     col = ifelse(growth.long$sex == "M", "blue", 'pink'))
+```
+```{r}
+library(ggplot2)
+
+ggplot(growth.long, aes(x = age, y = distance, group = subjid, color = sex)) +
+  geom_line() +  
+  geom_point() +
+  labs(title = "Distance vs Age for each subject",
+       color = "Sex")
+```
+
+
+\noindent \textbf{c)} "Fit three mixed models that control for age, sex, and their interaction. The first model should incorporate a random intercept, the second model should have independent random intercept and slope (for age), and the third model should have a random intercept and slope (for age) and allow for correlation between them. Pick which you think is the most appropriate model for these data using AIC or BIC."
+
+```{r}
+mod.1 <- lmer(distance ~ age * sex + (1 | subjid), data = growth.long)
+mod.2 <- lmer(distance ~ age * sex + (1 + age || subjid), data = growth.long)
+mod.3 <- lmer(distance ~ age * sex + (1 + age | subjid), data = growth.long)
+
+summary(mod.1)
+summary(mod.2)
+summary(mod.3)
+```
+
+```{r}
+AIC(mod.1, mod.2, mod.3)
+```
+
+model 1 has the lowest AIC and is therefore the best model. However, the boundary (singular) warning suggests that the models may be too complex given the low number of levels within the 'age' category not allowing for a high enough variance for randomness.
+
+\noindent \textbf{d)} Use the model you selected from part b) to add the population average trends to your plot in part b) for both boys and girls separately.
+
+```{r}
+# get x values
+new.x <- seq(min(growth.long$age, na.rm = T), max(growth.long$age, na.rm = T), length.out = 300)
+new.data.female <- data.frame(
+  age = new.x,
+  sex = factor(rep("F", 300))
+)
+
+new.data.male <- data.frame(
+  age = new.x,
+  sex = rep("M", 300)
+)
+
+# use re.form = NA to get average trends (avoid random effects with N(0, var))
+y.pred.female <- predict(mod.1, newdata = new.data.female, re.form = NA)
+y.pred.male <- predict(mod.1, newdata = new.data.male, re.form = NA)
+
+plot(distance ~ age, data = growth.long,
+     col = ifelse(growth.long$sex == 'M', 'blue', 'pink'))
+lines(y.pred.female ~ new.data.female$age,
+      lwd = 2,
+      col = 'pink')
+lines(y.pred.male ~ new.data.male$age,
+      lwd = 2,
+      col = 'blue')
+
+legend('bottomright',
+       legend = c('Male average trend', 'Female average trend'),
+       col = c('blue','pink'),
+       title = 'Gender',
+       lwd = 2)
+```
+
+\noindent \textbf{e)} Formally test whether the distance between the pituitary to the pteryomaxillary fissure differs between boys and girls at birth (hint: you might want to use the `lmerTest` package).
+
+```{r}
+contrast.matrix <- matrix(c(1, 0, 1, 0), ncol = length(fixef(mod.1)))
+
+contrast.result <- contest(mod.1, contrast.matrix)
+print(contrast.result)
+```
+
+The contrast vector (1,0,1,0) tests the difference in distance between sexes at the age of intercept: 0 in this case. The contrast test reveals a p-value < 0.05, meaning that there is a enough evidence to reject the null hypothesis. Thus, there is enough evidence to suggest a difference between the pituitary and pteryomaxillary fissure in boys versus girls at birth.
+
+\noindent \textbf{f)} Formally test whether the change in distance over time is different for boys versus girls. 
+
+```{r}
+# looks like it based on chart... test slope difference over only relevant age values
+contrast.matrix.f <- matrix(c(0, 0, 0, 1), ncol = length(fixef(mod.1)))
+
+contest(mod.1, contrast.matrix.f)
+```
+
+The test outputs a p-value < 0.05, suggesting that the null hypothesis should be rejected: the rate of change is *not* the same for boys and girls. Thus, the test proves that adding the interaction term for age:sex improves the model since the rate of change in distance over time (age) differs for boys and girls.
+
+\clearpage
+
+### Problem 3
+
+You've been asked to determine how player performance, measured via batting average, progresses as major league baseball players age.  The belief is that players peak at different ages, and that the mean peak is around 30 years of age.  
+
+The dataset `mlb_batting_data.csv` contains year-by-year batting records for all positional players with at least one at-bat (an opportunity to record a hit) from 1980 until 2021.  A player's batting average (BA) is the proportion of at-bats in which he records a hit (BA = H/AB) will be the response variable, and a player's age in year (Age) will be the predictor.  A mixed model to predict BA from AGE will be used to model the career arc of each player.  
+
+Let $Y$ be batting average, and let $X$ be a player's age.  Then a reasonable mixed model for these data could be written as such: \vspace{-0.1in} \begin{align*}
+Y_{i,j} &\sim N\left(\beta_{0,j} + \beta_{1,j} X_{i,j}+ \beta_{2,j} X_{i,j}^2 , \sigma_y^2/n_{i,j}\right) \\
+ \beta_{0,j} &\sim N\left(\mu_0,\sigma_0^2\right) \\
+ \beta_{1,j} &\sim N\left(\mu_1,\sigma_1^2\right) \\
+ \beta_{2,j} &\sim N\left(\mu_2,\sigma_2^2\right)
+\end{align*} 
+for the $i^{th}$ measurement for the $j^{th}$ player.  For example the Red Sox's David Ortiz was 39 years old in 2015, his $19^{th}$ year in the league, and had a batting average of 0.273 in 528 at-bats.  Thus his measurements were $Y_{19,j'}=0.273, X_{19,j'}=39,\text{ and } n_{19,j'}=528$ (Ortiz is the $j'^{th}$ player in the database...the exact value for $j'$ is not easy to determine and not really important).
+
+\noindent \textbf{(a)} Determine how many unique players are in the data set.  Create a histogram of the variable \texttt{Age}.  Comment on what you notice. 
+
+```{r}
+mlbdata <- read_csv("data/mlbdata.csv")
+```
+```{r}
+cat('the number of unique players is', length(unique(mlbdata$playerID)))
+
+hist(mlbdata$Age)
+```
+The distribution is right skewed with a mean of around 25 or 26 years old.
+
+\noindent \textbf{(b)} Create two plots: (i) the histogram of years played by individuals, and (ii) the scatterplot of career batting average vs. years played for each individual.  Briefly comment on what you notice.
+
+```{r}
+playerIDs <- unique(mlbdata$playerID)
+
+# loop through each player
+
+player.df <- data.frame(
+  playerID = character(),
+  years.played = numeric(),
+  career.avg = numeric()
+)
+for (player in playerIDs){
+  
+  # get data for individual player
+  player.data <- mlbdata[mlbdata$playerID == player, ]
+  
+  # row bind to the df
+  player.df <- rbind(player.df, data.frame(
+    playerID = player,
+    years.played = length(unique(player.data$yearID)),
+    career.avg = mean(player.data$BA, na.rm = T)
+  ))
+} 
+```
+
+
+```{r, fig.width=12, fig.height=6}
+# create plots
+par(mfrow = c(1,2))
+hist(player.df$years.played,
+     main = 'histogram of years played by individuals',
+     col = 'blue4')
+plot(career.avg ~ years.played, data = player.df,
+     col = NA,
+     bg = rgb(1,0,0, alpha = 0.1),
+     pch = 21,
+     main = 'career batting average vs. years played')
+```
+the plot of frequency of years played for each individual represents count data and looks to resemble a Poisson distribution. There seems to be a slight increase in average for additional years played although it is hard to tell since the frequency of years played is heavily left skewed. Additionally, lower number of years played have much higher variance and many more outliers, which makes intuitive sense as players who played less years and less games have a lower sample size for their career batting average.
+
+
+
+\noindent \textbf{(c)} Fit a quadratic regression model using the \texttt{lm} function in R to predict \texttt{BA} from \texttt{Age} and \texttt{Age}$^2$, using the argument \texttt{weight=AB} to account for the fact that there is more information/certainty in estimating the true batting average for players when they have more at-bats (which also mimics the stated variance $\sigma^2_y$ in the probabilistic model statement above).
+
+```{r}
+mod.3c <- lm(BA ~ Age + I(Age^2), data = mlbdata, weights = AB)
+summary(mod.3c)
+```
+
+
+\noindent \textbf{(d)} Use the \texttt{lmer} function in the \texttt{lme4} package for R to fit the mixed model suggested in this study (this could be called a 'random intercept, slope, and quadratic term' model), and be sure to use the argument \texttt{weight=AB} here too.  Note: you can ignore the warnings, or you can attempt to fix them using more iterations in the optimization function.  
+
+```{r}
+mod.3d <- lmer(BA ~ Age + I(Age^2) + (Age + I(Age^2) | playerID), data = mlbdata, weights = AB)
+summary(mod.3d)
+```
+
+
+\noindent \textbf{(e)} Use your estimates for the two models to plot the average 'career arc' for each model on one set of axes (line plots make the most sense).  Determine the estimated peaks of each arc.
+
+```{r}
+x <- seq(min(mlbdata$Age), max(mlbdata$Age), by = 1)
+
+new.df <- data.frame(Age = x)
+
+c.pred <- predict(mod.3c, newdata = new.df)
+d.pred <- predict(mod.3d, newdata = new.df, re.form = NA)  #re.form = NA -> no random effects
+
+# plot with entire range of both predictions on Y ax, 
+plot(c.pred ~ x, 
+     type = 'l', 
+     col = 'blue', 
+     lwd = 2, 
+     ylim = range(c(c.pred, d.pred)),
+     xlab = 'Age',
+     ylab = 'predicted values of BA'
+     )
+lines(d.pred ~ x, 
+      col = 'red', 
+      lwd = 2)
+legend('left', legend = c('3c Model', '3d Model'), col = c('blue', 'red'), lwd = 2)
+```
+
+
+\noindent \textbf{(f)} Compare the results of the two models in the previous parts.  What is the interpretation of each?  Why do they differ in value?
+
+Starting with the fixed effects, model 3c and 3d suggest that early in a player's career, the batting average increases by about 0.003 and 0.01 respectively. Then, the negative coefficient for *I(Age^2)* and the statistical significance for this term in both models suggest that an inflection point occurs roughly in the middle of a player's career as the increase in average occurs at a decreasing rate. Interpreting the random effects for part d, the intercept value of about 0.16 suggests that there is high variance in the starting career average for players. However, the lower coefficient values of 0.01 and 0.00001 for the *Age* and *I(Age^2)* term suggest that there is some but little variation in the increase in average throughout a player's career and even less variation in the rate of increase throughout a player's career. The evident heteroscedasticity and high leverage from fitted values with high batting averages (shown in the below plot) could have caused the upwards skew from the lm() model in 3c. However, we would expect the weights of at-bats to alleviate some of this overestimation. Lastly, the shrinkage properties of random effects in the mixed model in 3d allows convergence of each player's intercept and slope closer to the group mean, which could result in lower predicted values seen in the above plot in (e) as the predicted values are less influenced by extreme batting averages, which tend to be upward-skewed as shown in the below plots.
+
+
+```{r}
+plot(mod.3c)
+```
+

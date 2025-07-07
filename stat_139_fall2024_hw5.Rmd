@@ -1,0 +1,320 @@
+---
+title: "Problem Set 5"
+author: "STAT 139 (Fall 2024) Teaching Team"
+date: "Due Saturday, October 12, 2024 at 11:59pm"
+output: pdf_document
+---
+
+
+
+
+\begin{small} 
+		
+\textbf{Problem set policies.} \textit{Please provide concise, clear answers for each question while making sure to fully explain your reasoning. For problems asking for calculations, show your work in addition to clearly indicating the final answer. For problems involving \texttt{R}, be sure to include the code and output in your solution.}
+
+\textit{Please submit the PDF of your knit solutions to Gradescope and be sure to assign which pages of your solution correspond to each problem. Make sure that the PDF is fully readable to the graders; e.g., make sure that lines don't run off the page margin.}
+
+\textit{We encourage you to discuss problems with other students (and, of course, with the teaching team), but you must write your final answer in your own words. Solutions prepared ``in committee'' are not acceptable. If you do collaborate with classmates on a problem, please list your collaborators on your solution. Be aware that simply copying answers found online, whether human-generated or machine-generated, is a violation of the Honor Code.}
+		
+\end{small}
+
+
+\clearpage
+
+
+### Problem 1: (Potentially) Fooled by Randomness
+
+Repeatedly simulate datasets from the following model:
+
+$$Y_i = \beta_0 + \beta_1 x_i + \varepsilon_i ~~~~~~~~ \varepsilon_i \sim N(0,\sigma^2) ~~~~~~~~ i=1,\ldots n$$
+
+where $n=20$, $\beta_0 = 1$, $\beta_1 = 2$, and $\sigma^2 = 1$. Further, simulate the $x_i$'s from a $N(0,1)$ distribution. For each simulation, fit the true model with `lm()` and create two diagnostic plots: a residuals vs. fitted plot and a normal $QQ$ plot. Repeatedly do this until you identify the three plots that would best mistakenly violate:
+
+\noindent \textbf{(a)} The assumption of linearity.
+
+```{r}
+# set seed and known vars
+set.seed(146)  
+n <- 20  
+x <- rnorm(n, mean = 0, sd = 1)  # simulate x_i's
+beta.0 <- 1
+beta.1 <- 2
+epsilon <- rnorm(n, mean = 0, sd = 1)
+
+#formula for LR, create df, fit lm
+Y <- beta.0 + beta.1*x + epsilon
+data <- data.frame(Y = Y, X = x)
+
+
+mod.a <- lm(Y ~ X, data = data)
+summary(mod.a)
+```
+```{r}
+# get residuals vs fitted plot with base plot func
+plot(mod.a, which = 1)
+```
+```{r}
+# get Q-Q plot with base plot func
+plot(mod.a, which = 2)
+```
+
+The residuals vs fitted plot appears to mistakenly violate the linearity assumption because the outliers skew the residuals in a non-linear shape/pattern.
+
+\noindent \textbf{(b)} The assumption of homoskedasticity.
+
+```{r}
+# try different seed with known vars
+set.seed(14)  
+n <- 20  
+x <- rnorm(n, mean = 0, sd = 1)  # simulate x_i's
+beta.0 <- 1
+beta.1 <- 2
+epsilon <- rnorm(n, mean = 0, sd = 1)
+
+#formula for LR, create df, fit lm
+Y <- beta.0 + beta.1*x + epsilon
+data <- data.frame(Y = Y, X = x)
+
+
+mod.b <- lm(Y ~ X, data = data)
+summary(mod.b)
+```
+
+```{r}
+# get residuals vs fitted plot with base plot func
+plot(mod.b, which = 1)
+```
+
+```{r}
+# get Q-Q plot with base plot func
+plot(mod.a, which = 2)
+
+```
+```{r}
+# get scale-location plot with base plot func
+plot(mod.a, which = 3)
+
+```
+This plot suggests that the model mistakenly violates the assumption of homogeneity among residuals as higher values of absolute standardized residuals cause skew so that the residuals are not equally distributed for all fitted values
+
+\noindent \textbf{(c)} The assumption of normality.
+
+```{r}
+# try different seed with known vars
+set.seed(1)  
+n <- 20  
+x <- rnorm(n, mean = 0, sd = 1)  # simulate x_i's
+beta.0 <- 1
+beta.1 <- 2
+epsilon <- rnorm(n, mean = 0, sd = 1)
+
+#formula for LR, create df, fit lm
+Y <- beta.0 + beta.1*x + epsilon
+data <- data.frame(Y = Y, X = x)
+
+
+mod.c <- lm(Y ~ X, data = data)
+summary(mod.c)
+```
+```{r}
+plot(mod.c, which = 1)
+```
+
+```{r}
+plot(mod.c, which = 2)
+
+```
+The outliers show in the Q-Q plot show that the distribution has a tail that deviates from the expected Normal Distribution.
+
+Make sure to use the `set.seed()` function so that you can recreate the scenarios. The most extreme plots will win bonus points.
+
+\clearpage
+
+### Problem 2: Faraway (2e) Chapter 6 Excercises
+
+Pick **one** of the datasets below that you find interesting and fit the associated linear model.^[If you don't find any of these datasets interesting, you still have to do the problem. Nice try.] Perform regression diagnostics on the model to answer the following questions. Display any plots that are relevant. Do not provide any plots about which you have nothing to say. Suggest possible improvements or corrections to the model where appropriate:
+
+\noindent \textbf{(a)} Check the constant variance assumption for the errors.
+
+```{r}
+lm.cheddar <- lm(taste ~ Acetic + H2S + Lactic, data = cheddar)
+summary(lm.cheddar)
+```
+```{r}
+# check homogeneity of errors
+plot(lm.cheddar)
+```
+The variance of the residuals remains fairly constant along all fitted values. That being said, the immediate summary of the model shows that "Acetic", meaning Acetic acid, is not a viable predictor of taste and could be dropped from the model.
+
+\noindent \textbf{(b)} Check the normality assumption.
+```{r}
+plot(lm.cheddar, which=2)
+```
+The QQ-plot shows that the tail ends of the distribution deviate slightly from the normal. However, this could be solved by removing the outliers that R conveniently points out.
+
+\noindent \textbf{(c)} Check for large leverage points.
+```{r}
+plot(lm.cheddar, which = 5)
+```
+
+Following the logic in the previous question, the outliers that R pointed out in the QQ plot are visible here. Leverage indicates that these observations do not have a large influence on model parameters except for 30, so 30 should be removed to reduce drastic changes occurring from that outlier.
+
+\noindent \textbf{(d)} Check for outliers.
+```{r}
+plot(lm.cheddar, which = 3)
+```
+The standardized residuals plot points out large values for the same outliers previously observed in the last 2 plots.
+
+\noindent \textbf{(e)} Check for influential points.
+
+```{r}
+plot(lm.cheddar, which=4)
+```
+Cook's distance is a measure of influential points, and flags observations that are extreme relative to others. This plot points out the same three problematic observations
+
+\noindent \textbf{(f)} Check the structure of the relationship between the predictor and the response.
+
+```{r}
+# use an added variable plot from car pkg
+library(car)
+avPlots(lm.cheddar)
+```
+This added variable plot shows a visual representation of what summary(lm.cheddar) suggested in part a: Lactic and H2S have a clear linear relationship with the response variable but Acetic Acid shows no relationship. Thus, Acetic should be removed from the model.
+
+\vspace{1em}
+
+\underline{Datasets:}
+
+`sat`: contains data on school expenditure and test scores in the US in 1994-95 (in the `faraway` package). For this dataset, fit a model with total SAT score (`total`) as the dependent variable, and `expend`, `salary`, `ratio` and `takers` as the independent variables.
+
+`teengamb`: contains data on a survey conducted on teenage gambling in Britain (in the `faraway` package). For this dataset, fit a model with `gamble` as the dependent variable and all the other variables as independent variables.
+
+`prostate`: contains data on a study of men with prostate cancer due to receive radical prostatectomy (in the `faraway` package). For this dataset, fit a model with `lpsa` as the dependent variable, and all the other variables as independent variables. 
+
+`swiss`: contains standardized fertility measure and socioeconomic indicators for each of 47 French-speaking provinces of Switzerland around 1888 (in `datasets` package). For this dataset, fit a model with `Fertility` as the dependent variable and all the other variables as the independent variables.
+
+`cheddar`: contains data on a study of cheddar cheese from the LaTrobe Valley of Victoria, Australia, in which samples of cheese were analyzed for their chemical composition and were subjected to taste tests (in the `faraway` package). Overall taste scores were obtained by combining the scores from several tasters. For this dataset, fit a model with `taste` as the dependent variable and the other three variables as the independent variables.
+
+`happy`: contains data on happiness from a sample of students collected in a University of Chicago MBA class (in the `faraway` package). For this dataset, fit a model with `happy` as the dependent variable, and the other four variables as independent variables.
+
+`tvdoctor`: contains data on life expectancy, doctors and televisions collected on 38 countries in 1993 (in the `faraway` package). For this dataset, fit a model with `life` as the dependent variable and the other two variables as independent variables. 
+
+
+\clearpage
+
+### Question 3: ANOVA and Regression
+
+The included dataset `mouse.csv` contains body weight data on a sample of mice from eight inbred strains that are the founder strains used to create a resource known as the *Collaborative Cross*. In this problem, we will hold off on doing diagnostics until part \textbf{(d)}, even though in a real-world analysis, any interpretation should come after you perform your diagnostics, and satisfactorily address any potential issues in your dataset.
+
+\noindent \textbf{(a)} Using ANOVA (that is, use the `aov()` function in \textsf{R}) formally test the hypothesis that the population body weights for all eight strains are equal. Make sure to formally state your null and alternative hypotheses, your test statistic, the level of your test, and the associated $p$-value. Describe your conclusions in language suitable for a non-statistician collaborator. 
+
+```{r}
+library(readr)
+mouse <- read_csv("data/mouse.csv")
+mouse.anova <- aov(bw ~ strain, data = mouse)
+summary(mouse.anova)
+```
+null hypothesis: the population body weights for all eight strains are equal. 
+alternative hypothesis: the population body weights for at least one of the strains has a different mean.
+
+The test-statistic is an F-statistic, which measures whether a significant difference exists in variance within groups versus between groups, with 7 degrees of freedom. The summary shows that with an $\alpha$ level of 0, indicated by ***, the p-value, or the probability that the null hypothesis is true given the data, approaches 0.
+
+\noindent \textbf{(b)} Now fit the model with `lm()`, including an intercept. Interpret that intercept. Note the correspondence between the F-statistic from the regression model, and that in the ANOVA table.
+
+```{r}
+lm.mouse <- lm(bw ~ strain, data = mouse)
+summary(lm.mouse)
+```
+The intercept is 23.2781, suggesting that based on the linear model, if the mouse is of none of the strains listed/ if the strain is unspecified, the body weight of the mouse is expected to be 23.2781 g. Additionally, the F-statistic is the same for the linear model and the anova. 
+
+\noindent \textbf{(c)} We mentioned in class that the one-way ANOVA "Sum of Squares Between" corresponds to the additional sum of squares accounted for by including the factor of interest, compared to fitting an intercept-only model. Show that this is the case in this scenario by computing the sum of squares accounted for by an intercept-only model, and the sum of squares from the `lm()` fit that controls for strain. Show that the difference between these two sums of squares corresponds to the "Sum of Squares Within" in your ANOVA table in part \textbf{(a)}. No need to do any math here, just compute the relevant quantities in \textsf{R}.
+
+```{r}
+# create intercept-only model
+lm.intercept <- lm(bw ~ 1, data = mouse)
+ssq.intonly <- (mouse$bw - mean(mouse$bw))^2
+
+ssq.lm <- (mouse$bw - predict(lm.mouse))^2
+dif <- ssq.intonly - ssq.lm
+
+# add all differences together and print next to ANOVA SS-within
+sum(dif)
+
+summary(mouse.anova)
+```
+
+
+\noindent \textbf{(d)} Now, compute residual diagnostics from your model in part \textbf{(b)}. Suppose you were actually analyzing this dataset for a collaborator. Based on your diagnostics, what should you have discussed with your collaborator before you proceeeded to analyze these data? Do you have any idea of what might have happened in this case? 
+
+```{r}
+par(mfrow = c(2, 2))
+plot(lm.mouse)
+```
+The residuals are clearly forming groups as they are being fit on all 8 strains. The Q-Q plot shows that the residuals do not deviate much from normality although some outliers are apparent. I would discuss removing outliers with my collaborator, especially the outlier from observation 190. I do not know what happened to produce this large outlier, but experimental mishaps are common in Biology: maybe it was actually a rat?
+
+
+\noindent \textbf{(e)} Did you actually need to check the linearity assumption in part (d)? Why or why not? Just provide a little intuition. 
+
+No, because we know that this linear model is actually an analysis of groups, so we do not expect the residuals vs fitted plot to show a linear relationship.
+
+\noindent \textbf{(f)} Address any issues in the data as you see fit (you can discuss with a TF in office hours and they will pretend to be your collaborator). Refit the model from part \textbf{(b)}. If your overall $F$-test is significant (it should be very significant!), proceed to pairwise tests for the differences in mean weights between every pair of strains (hint: you saw a function in class that should make this very easy). In your pairwise $t$-tests, use the Bonferroni-adjusted $p$-values. Does there seem to be some structure or grouping to the strains?
+
+```{r}
+# refit lm without outliers shown in above plots
+
+lm.mouse.refit <- lm(bw ~ strain, data = mouse[-c(190,180,183),])
+summary(lm.mouse.refit)
+```
+```{r}
+idx <- -c(190,180,183)
+x <- mouse$bw[idx]
+g <- mouse$strain[idx]
+
+pairwise.t.test(x, factor(g), p.adjust.method = "bonferroni")
+```
+
+There does seem to be some structure and groupings of the strains. For instance, the null hypothesis that C57BL/6J and A/J have the same mean can be rejected, but CAST/EiJ and WSB/EiJ cannot reject the null hypothesis as the bonferroni P adjusted value is 1, meaning that there is no observed differnce in means between those two groups.
+
+\noindent \textbf{(g)} If you are interested, read a little bit online about the Collaborative Cross and see if your results from part \textbf{(f)} make sense scientifically.^[This part will not be graded, although you might find it interesting!]
+
+\clearpage
+
+
+
+### Question 4: Interpretation of Parameter Estimates
+
+The included dataset `harvardsqhomes.csv` contains data on a sample of homes in the Harvard Square area that were on the market in 2022.  Among others, it includes the following variables:
+
+`price`: the price of the home (in dollars)
+
+`beds`: the number of bedrooms in the home
+
+`sqft`: the square footage of the home
+
+`baths`: the number of bathrooms in the home
+
+`year`: the year the home was built
+
+\vspace{1em}
+
+```{r}
+harvardsqhomes <- read_csv("data/harvardsqhomes.csv")
+```
+
+
+\noindent \textbf{(a)} Fit a simple linear regression with price **in thousands of dollars** as the dependent variable and `beds` as the sole predictor. Interpret the coefficient estimate associated with `beds`. 
+
+```{r}
+lm.homes <- lm(price/1000 ~ beds, data = harvardsqhomes)
+summary(lm.homes)
+```
+each additional bed is associated with a $247.98k increase in price of a home in Harvard Square.
+
+
+\noindent \textbf{(b)} Now fit a multiple linear regression by adding `sqft`, `baths` and `year` to your model. Interpret the estimate associated with `beds` again. Reconcile the estimate from this model with the one from part \textbf{(a)}. Does it make sense why and how it changed? No math required here, just some intuition/explanation.
+
+```{r}
+lm.homes.mlt <- lm(price/1000 ~ beds + sqft + baths + year, data = harvardsqhomes)
+summary(lm.homes.mlt)
+```
+The flipping of the sign to negative in beds suggests some assumptions about housing market dynamics in Harvard square. When creating a linear model with a direct relationship, an increase in beds resulted in an increase in price. But, when considering increase in sqft and baths (but not so much year as it appears to be insignificant) in addition to beds, square feet and baths add more value to the property in comparison. Further, the increase in beds while keeping square feet and baths constant in this multiple linear regression could be expected to reduce the value as more bedrooms would encroach upon living space and bathrooms.
